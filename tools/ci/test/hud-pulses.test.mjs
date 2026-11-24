@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { detectPulses, hoverVerdict, parseFrames, verdictOf } from '../hud-pulses.mjs'
+import { detectPulses, dragVerdict, hoverVerdict, parseFrames, verdictOf } from '../hud-pulses.mjs'
 
 const SCRIPT = fileURLToPath(new URL('../hud-pulses.mjs', import.meta.url))
 const HEADER = 't_ms,foreground,x,y,w,h'
@@ -209,4 +209,99 @@ test('CLI hover: 0 ok, 1 falha, 4 nunca visivel, 2 uso', () => {
     assert.equal(cli(csv, '--expect', 'hover', '--events', 'nao e json').code, 2)
     assert.equal(cli(csv, '--expect', 'pulse', '--events', events).code, 2)
     assert.equal(cli(csv, '--events', events).code, 2)
+})
+
+// Arrasto: a caixa em repouso antes de apertar e 4 s depois de soltar; o centro tem de andar (dx, dy) ate tolerancePx.
+const BOX = { x: 100, y: 50, w: 200, h: 80 }
+const DRAG = { pressMs: 5000, releaseMs: 5500, dx: -200, dy: 120 }
+
+// Quadros com a caixa dada por at(t); foreground 0 quando nada aparece.
+function dragFrames(at, durationMs = 12000) {
+    const frames = []
+    for (let tMs = 0; tMs <= durationMs; tMs += 50) {
+        const { x, y, foreground } = at(tMs)
+        frames.push({ tMs, foreground, x, y, w: BOX.w, h: BOX.h })
+    }
+    return frames
+}
+
+// HUD em repouso, anda linearmente no arrasto e pousa em (landX, landY); durante o arrasto aparece com duringForeground.
+function floatingDrag({ landX = BOX.x + DRAG.dx, landY = BOX.y + DRAG.dy, restForeground = HUD, duringForeground = HUD, openForMs = 0 } = {}) {
+    return dragFrames((tMs) => {
+        if (tMs < DRAG.pressMs) return { x: BOX.x, y: BOX.y, foreground: HUD }
+        if (tMs < DRAG.releaseMs) {
+            const progress = (tMs - DRAG.pressMs) / (DRAG.releaseMs - DRAG.pressMs)
+            return { x: BOX.x + (landX - BOX.x) * progress, y: BOX.y + (landY - BOX.y) * progress, foreground: duringForeground }
+        }
+        const open = tMs < DRAG.releaseMs + openForMs
+        return { x: landX, y: landY, foreground: open ? PULSE : restForeground }
+    })
+}
+
+test('arrasto: a HUD anda (dx, dy) e termina recolhida: ok', () => {
+    assert.equal(dragVerdict(floatingDrag(), DRAG), 'ok')
+})
+
+test('arrasto: 5 px em cada eixo (7 px na diagonal) ainda e ok', () => {
+    assert.equal(dragVerdict(floatingDrag({ landX: BOX.x + DRAG.dx + 5, landY: BOX.y + DRAG.dy - 5 }), DRAG), 'ok')
+})
+
+test('arrasto: a caixa nao andou: not-moved', () => {
+    assert.equal(dragVerdict(floatingDrag({ landX: BOX.x, landY: BOX.y }), DRAG), 'not-moved')
+})
+
+test('arrasto: andou so 5 px: not-moved', () => {
+    assert.equal(dragVerdict(floatingDrag({ landX: BOX.x + 5, landY: BOX.y }), DRAG), 'not-moved')
+})
+
+test('arrasto: andou para o lado oposto: wrong-place', () => {
+    assert.equal(dragVerdict(floatingDrag({ landX: BOX.x - DRAG.dx, landY: BOX.y + DRAG.dy }), DRAG), 'wrong-place')
+})
+
+test('arrasto: andou 9 px fora do destino: wrong-place', () => {
+    assert.equal(dragVerdict(floatingDrag({ landX: BOX.x + DRAG.dx + 9, landY: BOX.y + DRAG.dy }), DRAG), 'wrong-place')
+})
+
+test('arrasto: HUD ainda aberta 4 s depois de soltar: not-closed', () => {
+    assert.equal(dragVerdict(floatingDrag({ restForeground: PULSE }), DRAG), 'not-closed')
+})
+
+test('arrasto: repouso 11% acima do inicial: not-closed; 10%: ok', () => {
+    assert.equal(dragVerdict(floatingDrag({ restForeground: 1110 }), DRAG), 'not-closed')
+    assert.equal(dragVerdict(floatingDrag({ restForeground: 1100 }), DRAG), 'ok')
+})
+
+test('arrasto: aberta durante o arrasto e fechada 4 s depois de soltar: ok', () => {
+    assert.equal(dragVerdict(floatingDrag({ duringForeground: PULSE, openForMs: 2000 }), DRAG), 'ok')
+})
+
+test('arrasto: nunca visivel depois de soltar: not-visible', () => {
+    assert.equal(dragVerdict(floatingDrag({ restForeground: 0 }), DRAG), 'not-visible')
+})
+
+test('arrasto: nunca visivel: not-visible', () => {
+    assert.equal(dragVerdict(dragFrames(() => ({ x: BOX.x, y: BOX.y, foreground: 0 })), DRAG), 'not-visible')
+})
+
+test('arrasto: tolerancePx por opcao: 9 px com tolerancePx 10 e ok', () => {
+    assert.equal(dragVerdict(floatingDrag({ landX: BOX.x + DRAG.dx + 9 }), { ...DRAG, tolerancePx: 10 }), 'ok')
+})
+
+test('CLI drag: 0 ok, 1 falha, 4 nunca visivel, 2 uso', () => {
+    const events = JSON.stringify(DRAG)
+    const ok = cli(writeCsv('drag-ok.csv', toCsv(floatingDrag())), '--expect', 'drag', '--events', events)
+    assert.equal(ok.code, 0)
+    assert.equal(ok.stdout.split('\n')[0], 'ok')
+
+    const still = cli(writeCsv('drag-still.csv', toCsv(floatingDrag({ landX: BOX.x, landY: BOX.y }))), '--expect', 'drag', '--events', events)
+    assert.equal(still.code, 1)
+    assert.equal(still.stdout.split('\n')[0], 'not-moved')
+
+    assert.equal(cli(writeCsv('drag-none.csv', toCsv(floatingDrag({ restForeground: 0 }))), '--expect', 'drag', '--events', events).code, 4)
+
+    const csv = writeCsv('drag-usage.csv', toCsv(floatingDrag()))
+    assert.equal(cli(csv, '--expect', 'drag').code, 2)
+    assert.equal(cli(csv, '--expect', 'drag', '--events', '{"pressMs":5000,"releaseMs":4000,"dx":-200,"dy":120}').code, 2)
+    assert.equal(cli(csv, '--expect', 'drag', '--events', '{"pressMs":5000,"releaseMs":5500,"dx":-200}').code, 2)
+    assert.equal(cli(csv, '--expect', 'drag', '--events', 'nao e json').code, 2)
 })

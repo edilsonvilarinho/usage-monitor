@@ -2,9 +2,9 @@
 // Detector de pulsos da HUD (A02 do plano #652). Entrada: CSV de quadros da
 // captura (tools/real-app/record.ps1), um quadro a cada ~50 ms.
 //
-// Uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events '{"enterMs":n,"leaveMs":n}']
+// Uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events '{"enterMs":n,"leaveMs":n}' | --expect drag --events '{"pressMs":n,"releaseMs":n,"dx":n,"dy":n}']
 // Saida: veredito na primeira linha, depois um pulso por linha. Padrao: ok, pulsed, not-visible (0, 1, 4).
-// Hover: ok (0), not-opened, opened-late, not-closed, extra-pulse (1), not-visible (4); uso ou CSV invalido: 2.
+// Hover: ok (0), not-opened, opened-late, not-closed, extra-pulse (1), not-visible (4). Drag: ok (0), not-moved, wrong-place, not-closed (1), not-visible (4). Uso ou CSV invalido: 2.
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
@@ -88,6 +88,32 @@ export function hoverVerdict(result, { enterMs, leaveMs, openWithinMs = 1500, cl
     return closed ? 'ok' : 'not-closed'
 }
 
+// Arrasto (A04): repouso antes = quadros visiveis >= 3 s antes de apertar; depois = >= 4 s depois de soltar.
+// Tem de fechar (foreground dentro de restTolerance do inicial) e o centro andar (dx, dy) ate tolerancePx.
+export function dragVerdict(frames, { pressMs, releaseMs, dx, dy, tolerancePx = 8, restTolerance = 0.1 }) {
+    const visible = (frame) => frame.foreground >= DEFAULTS.minForeground
+    const before = frames.filter((frame) => frame.tMs <= pressMs - 3000 && visible(frame))
+    const after = frames.filter((frame) => frame.tMs >= releaseMs + 4000 && visible(frame))
+    if (before.length === 0 || after.length === 0) return 'not-visible'
+    const rest = restOf(before)
+    const landed = restOf(after)
+    if (Math.abs(landed.foreground - rest.foreground) > restTolerance * rest.foreground) return 'not-closed'
+    const moveX = landed.cx - rest.cx
+    const moveY = landed.cy - rest.cy
+    if (Math.hypot(moveX - dx, moveY - dy) <= tolerancePx) return 'ok'
+    if (Math.hypot(moveX, moveY) <= tolerancePx) return 'not-moved'
+    return 'wrong-place'
+}
+
+// Caixa de repouso: medianas do foreground e do centro da caixa de pixels alterados.
+function restOf(frames) {
+    return {
+        foreground: median(frames.map((frame) => frame.foreground)),
+        cx: median(frames.map((frame) => frame.x + frame.w / 2)),
+        cy: median(frames.map((frame) => frame.y + frame.h / 2)),
+    }
+}
+
 function closeRun(pulses, run, minFrames) {
     if (run.length < minFrames) return
     pulses.push({
@@ -123,22 +149,32 @@ function parseArgs(argv) {
         if (flags['--events'] !== undefined) throw new Error(USAGE)
         return { csv, expect: 'default' }
     }
+    if (flags['--expect'] === 'drag') return { csv, expect: 'drag', events: parseDragEvents(flags['--events']) }
     if (flags['--expect'] !== 'hover') throw new Error(USAGE)
     return { csv, expect: 'hover', events: parseEvents(flags['--events']) }
 }
 
-function parseEvents(text) {
-    const message = 'uso: --expect hover exige --events {"enterMs":n,"leaveMs":n}, em ms, com leaveMs >= enterMs'
+function parseJsonEvents(text, message) {
     if (text === undefined) throw new Error(message)
-    let events
     try {
-        events = JSON.parse(text)
+        return JSON.parse(text) ?? {}
     } catch {
         throw new Error(message)
     }
-    const { enterMs, leaveMs } = events ?? {}
+}
+
+function parseEvents(text) {
+    const message = 'uso: --expect hover exige --events {"enterMs":n,"leaveMs":n}, em ms, com leaveMs >= enterMs'
+    const { enterMs, leaveMs } = parseJsonEvents(text, message)
     if (!Number.isFinite(enterMs) || !Number.isFinite(leaveMs) || leaveMs < enterMs) throw new Error(message)
     return { enterMs, leaveMs }
+}
+
+function parseDragEvents(text) {
+    const message = 'uso: --expect drag exige --events {"pressMs":n,"releaseMs":n,"dx":n,"dy":n}, em ms e px, com releaseMs >= pressMs'
+    const { pressMs, releaseMs, dx, dy } = parseJsonEvents(text, message)
+    if (![pressMs, releaseMs, dx, dy].every(Number.isFinite) || releaseMs < pressMs) throw new Error(message)
+    return { pressMs, releaseMs, dx, dy }
 }
 
 function printVerdict(verdict, result) {
@@ -148,7 +184,13 @@ function printVerdict(verdict, result) {
 
 function main(argv) {
     const { csv, expect, events } = parseArgs(argv)
-    const result = detectPulses(parseFrames(readFileSync(csv, 'utf8')))
+    const frames = parseFrames(readFileSync(csv, 'utf8'))
+    if (expect === 'drag') {
+        const verdict = dragVerdict(frames, events)
+        console.log(verdict)
+        return verdict === 'ok' ? EXIT.ok : verdict === 'not-visible' ? EXIT['not-visible'] : EXIT.pulsed
+    }
+    const result = detectPulses(frames)
     if (expect === 'hover') {
         const verdict = hoverVerdict(result, events)
         printVerdict(verdict, result)
