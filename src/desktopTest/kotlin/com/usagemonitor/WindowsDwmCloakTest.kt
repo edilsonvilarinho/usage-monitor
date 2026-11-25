@@ -6,10 +6,12 @@ import com.usagemonitor.AutoStartManager.Platform
 import com.usagemonitor.presentation.ui.DWMWA_CLOAKED
 import com.usagemonitor.presentation.ui.WindowsDwmCloak
 import com.usagemonitor.presentation.ui.dwmApi
+import com.usagemonitor.presentation.ui.warmUpWindowCloak
 import java.awt.GraphicsEnvironment
 import javax.swing.JDialog
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Só no Windows e fora de modo headless: a chamada ao DWM não existe em outro lugar. */
@@ -33,6 +35,74 @@ class WindowsDwmCloakTest {
             dialog.dispose()
         }
     }
+
+    @Test
+    fun `warm-up on a displayable window answers S_OK and leaves DWMWA_CLOAKED at 0`() {
+        if (!windowsWithDisplay()) return
+
+        // addNotify cria o peer sem mostrar a janela.
+        val dialog = JDialog()
+        try {
+            dialog.addNotify()
+
+            assertTrue(warmUpWindowCloak(arrayOf<java.awt.Window>(dialog)), "DWM deve responder S_OK para janela exibível")
+            assertEquals(0, cloakedValue(dialog), "DWMWA_CLOAKED depois do warm-up")
+        } finally {
+            dialog.dispose()
+        }
+    }
+
+    @Test
+    fun `warm-up without a displayable window only loads the library and answers false`() {
+        if (!windowsWithDisplay()) return
+
+        // Sem addNotify: a janela não é exibível e o warm-up não a toca.
+        val hidden = JDialog()
+        try {
+            assertFalse(warmUpWindowCloak(emptyArray()), "sem nenhuma janela")
+            assertFalse(warmUpWindowCloak(arrayOf<java.awt.Window>(hidden)), "janela não exibível")
+        } finally {
+            hidden.dispose()
+        }
+    }
+
+    @Test
+    fun `set(true) makes a window that is not displayable yet displayable and cloaks it`() {
+        if (!windowsWithDisplay()) return
+
+        val dialog = JDialog()
+        try {
+            assertFalse(dialog.isDisplayable, "pré-condição: janela ainda não exibível")
+            val cloak = WindowsDwmCloak(dialog)
+
+            assertTrue(cloak.set(true), "set(true) numa janela ainda não exibível")
+            assertTrue(dialog.isDisplayable, "set(true) deve criar o peer nativo")
+            assertEquals(1, cloakedValue(dialog), "DWMWA_CLOAKED depois de set(true)")
+            assertTrue(cloak.set(false), "set(false) depois de set(true)")
+        } finally {
+            dialog.dispose()
+        }
+    }
+
+    @Test
+    fun `set returns false when a LinkageError escapes the native call`() {
+        if (!windowsWithDisplay()) return
+
+        // addNotify falha como falharia sem a biblioteca: set não pode propagar.
+        val dialog = object : JDialog() {
+            override fun addNotify() {
+                throw NoClassDefFoundError("simulado")
+            }
+        }
+        try {
+            assertFalse(WindowsDwmCloak(dialog).set(true), "LinkageError deve virar false")
+        } finally {
+            dialog.dispose()
+        }
+    }
+
+    private fun windowsWithDisplay(): Boolean =
+        AutoStartManager.currentPlatform() == Platform.WINDOWS && !GraphicsEnvironment.isHeadless()
 
     private fun cloakedValue(window: java.awt.Window): Int {
         val value = IntByReference(-1)

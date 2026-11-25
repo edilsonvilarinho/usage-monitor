@@ -407,7 +407,7 @@ internal fun runUsageMonitor(
             return@LaunchedEffect
         }
         delay(SETTINGS_PREWARM_DELAY_MILLIS)
-        preloadWindowCloak(AutoStartManager.currentPlatform(), Dispatchers.IO, ::warmUpWindowCloak)
+        preloadWindowCloak(AutoStartManager.currentPlatform(), Dispatchers.IO) { warmUpWindowCloak() }
         settingsPrewarmReady = true
         delay(OTHER_MODALS_PREWARM_DELAY_MILLIS - SETTINGS_PREWARM_DELAY_MILLIS)
         modalPrewarmReady = true

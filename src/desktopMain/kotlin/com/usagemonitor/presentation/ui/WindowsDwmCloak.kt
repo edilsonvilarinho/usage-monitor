@@ -65,17 +65,15 @@ internal suspend fun preloadWindowCloak(
 }
 
 /**
- * Carrega `dwmapi` e, se houver janela AWT já exibida, lê o cloak dela. Chamada fora da EDT
- * por [preloadWindowCloak]. Sem janela exibida, só força a carga da biblioteca.
+ * Aquece a `dwmapi` fora da EDT. Com janela exibível, lê o cloak dela e responde se o DWM aceitou (S_OK);
+ * sem nenhuma, só toca `dwmApi` (força a carga da biblioteca) e responde false.
  */
-internal fun warmUpWindowCloak() {
-    val window = java.awt.Window.getWindows().firstOrNull { it.isDisplayable }
+internal fun warmUpWindowCloak(windows: Array<java.awt.Window> = java.awt.Window.getWindows()): Boolean {
+    val window = windows.firstOrNull { it.isDisplayable }
     if (window == null) {
-        loadDwmApi()
-        return
+        dwmApi
+        return false
     }
     val cloaked = IntByReference(0)
-    loadDwmApi().DwmGetWindowAttribute(Native.getWindowPointer(window), DWMWA_CLOAKED, cloaked, 4)
+    return dwmApi.DwmGetWindowAttribute(Native.getWindowPointer(window), DWMWA_CLOAKED, cloaked, 4) == 0
 }
-
-private fun loadDwmApi(): DwmApi = dwmApi
