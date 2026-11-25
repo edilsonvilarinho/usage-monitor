@@ -207,6 +207,132 @@ test('zoom sem campo image rejeita', async () => {
     await assert.rejects(pending, /imagem/);
 });
 
+test('duas linhas JSON no mesmo chunk, sem intervalo, sao processadas as duas', async () => {
+    const child = fakeChild();
+    const driver = createScreenDriver({ child, timeoutMs: 200 });
+    const first = driver.screenshot();
+    const second = driver.perform({ tool: 'wait', ms: 0 });
+    await settle();
+    child.stdout.write(`${JSON.stringify({ id: 1, ok: true, image: 'AAAA' })}\n${JSON.stringify({ id: 2, ok: true })}\n`);
+    assert.equal(await first, 'AAAA');
+    assert.equal(await second, undefined);
+    assert.equal(requests(child).length, 2);
+});
+
+test('linhas terminadas em CRLF sao lidas', async () => {
+    const child = fakeChild();
+    const driver = createScreenDriver({ child, timeoutMs: 200 });
+    const ready = driver.ready();
+    child.stdout.write(`${JSON.stringify({ ready: true, width: 800, height: 600 })}\r\n`);
+    assert.deepEqual(await ready, { width: 800, height: 600 });
+    const pending = driver.screenshot();
+    await settle();
+    child.stdout.write(`${JSON.stringify({ id: 1, ok: true, image: 'AAAA' })}\r\n`);
+    assert.equal(await pending, 'AAAA');
+});
+
+test('linha completa sem o \\n fica no buffer ate o \\n chegar', async () => {
+    const child = fakeChild();
+    const driver = createScreenDriver({ child, timeoutMs: 1000 });
+    const pending = driver.screenshot();
+    await settle();
+    child.stdout.write(JSON.stringify({ id: 1, ok: true, image: 'AAAA' }));
+    await settle();
+    child.stdout.write('\n');
+    assert.equal(await pending, 'AAAA');
+});
+
+test('ready ignora largura ou altura que nao e inteiro positivo; 1x1 vale', async () => {
+    const child = fakeChild();
+    const driver = createScreenDriver({ child, timeoutMs: 1000 });
+    const pending = driver.ready();
+    for (const size of [{ width: 0, height: 600 }, { width: -1, height: 600 }, { width: 1.5, height: 600 }, { width: 800 }, { width: 800, height: 0 }]) {
+        reply(child, { ready: true, ...size });
+    }
+    reply(child, { ready: true, width: 1, height: 1 });
+    assert.deepEqual(await pending, { width: 1, height: 1 });
+});
+
+test('ready:false rejeita com o erro do filho, sem matar e sem escrever', async () => {
+    const child = fakeChild();
+    const driver = createScreenDriver({ child, timeoutMs: 1000 });
+    const pending = driver.ready();
+    reply(child, { ready: false, error: 'sem janela' });
+    await assert.rejects(pending, { message: 'filho não ficou pronto: sem janela' });
+    await assert.rejects(driver.screenshot(), { message: 'filho não ficou pronto: sem janela' });
+    assert.equal(child.killed, 0);
+    assert.equal(child.stdin.written.length, 0);
+});
+
+test('ready:false sem texto de erro usa a mensagem padrao', async () => {
+    const child = fakeChild();
+    const driver = createScreenDriver({ child, timeoutMs: 1000 });
+    const pending = driver.ready();
+    reply(child, { ready: false });
+    await assert.rejects(pending, { message: 'filho não ficou pronto: erro desconhecido' });
+});
+
+test('JSON null e array nao derrubam o driver', async () => {
+    const child = fakeChild();
+    const driver = createScreenDriver({ child, timeoutMs: 1000 });
+    const pending = driver.screenshot();
+    await settle();
+    child.stdout.write('null\n[1,2]\n');
+    reply(child, { id: 1, ok: true, image: 'AAAA' });
+    assert.equal(await pending, 'AAAA');
+});
+
+test('ready sem linha no teto mata o filho', async () => {
+    const child = fakeChild();
+    const driver = createScreenDriver({ child, timeoutMs: 20 });
+    await assert.rejects(driver.ready(), /tempo/);
+    assert.equal(child.killed, 1);
+});
+
+test('close depois da saida do filho resolve sem matar', async () => {
+    const child = fakeChild();
+    const driver = createScreenDriver({ child, timeoutMs: 200 });
+    child.emit('exit', 0);
+    await driver.close();
+    assert.equal(child.killed, 0);
+});
+
+test('pedido depois de close sem saida do filho rejeita e nao escreve', async () => {
+    const child = fakeChild();
+    const driver = createScreenDriver({ child, timeoutMs: 20 });
+    await driver.close();
+    await assert.rejects(driver.screenshot(), /fechado/);
+    assert.equal(child.stdin.written.length, 0);
+});
+
+test('close chamado duas vezes: o segundo espera a saida e resolve', async () => {
+    const child = fakeChild();
+    const driver = createScreenDriver({ child, timeoutMs: 20 });
+    await driver.close();
+    const second = driver.close();
+    child.emit('exit', 0);
+    await second;
+    assert.equal(child.stdin.ended, true);
+});
+
+test('screenshot com image vazia rejeita', async () => {
+    const child = fakeChild();
+    const driver = createScreenDriver({ child, timeoutMs: 1000 });
+    const pending = driver.screenshot();
+    await settle();
+    reply(child, { id: 1, ok: true, image: '' });
+    await assert.rejects(pending, /imagem/);
+});
+
+test('zoom com image vazia rejeita', async () => {
+    const child = fakeChild();
+    const driver = createScreenDriver({ child, timeoutMs: 1000 });
+    const pending = driver.zoom({ x: 0, y: 0, w: 16, h: 16 });
+    await settle();
+    reply(child, { id: 1, ok: true, image: '' });
+    await assert.rejects(pending, /imagem/);
+});
+
 test('ai-pilot-driver.mjs: fonte sem fs, process.env nem child_process', () => {
     const source = readFileSync(MODULE_PATH, 'utf8');
     assert.equal(source.includes('node:fs'), false);

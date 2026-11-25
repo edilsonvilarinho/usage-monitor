@@ -2,18 +2,19 @@
 // Detector de pulsos da HUD (A02 do plano #652). Entrada: CSV de quadros da
 // captura (tools/real-app/record.ps1), um quadro a cada ~50 ms.
 //
-// Uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events '{"enterMs":n,"leaveMs":n}' | --expect drag --events '{"pressMs":n,"releaseMs":n,"dx":n,"dy":n}'] [--rise-ratio <n>] [--min-rest-width <n>] [--max-rest-foreground <n>] [--max-foreground <n>]
+// Uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events '{"enterMs":n,"leaveMs":n}' | --expect drag --events '{"pressMs":n,"releaseMs":n,"dx":n,"dy":n}'] [--rise-ratio <n>] [--min-rest-width <n>] [--max-rest-foreground <n>] [--max-foreground <n>] [--scene <nome>]
 // Saida: veredito na primeira linha, depois um pulso por linha. Padrao: ok, pulsed, not-visible (0, 1, 4).
+// --scene <nome> (cenas em tools/real-app/scenes.json): so roda quando o veredito atual e ok; low-rate (6), demais de cena (1), motivo na 2a linha. Nome desconhecido: uso (2).
 // Limiar: hover mede o repouso antes de entrar (mediana); os outros modos usam o p5 dos visiveis.
 // Hover: ok (0), not-opened, opened-late, not-closed, extra-pulse (1), not-visible (4). Drag: ok (0), not-moved, wrong-place, not-closed (1), not-visible (4). Open-at-rest (1) com --max-rest-foreground (inteiro > 0): repouso acima do maximo, antes do veredito de pulso. Flash (1) com --max-foreground (inteiro > 0): um quadro acima do maximo, em qualquer ponto, antes de open-at-rest; uma linha `quadro <tMs> <foreground>` por quadro. Uso ou CSV invalido: 2.
 // --rise-ratio (> 1, padrao 1.5) troca o limiar de subida. --min-rest-width (inteiro > 0) confere a escala da cena antes de qualquer
 // outro veredito: mediana de w no repouso abaixo do minimo e wrong-scene (5); sem quadro nessa janela, not-visible.
 import { readFileSync } from 'node:fs'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const HEADER = 't_ms,foreground,x,y,w,h'
 const DEFAULTS = { settleMs: 2000, riseRatio: 1.5, minFrames: 2, minForeground: 400, tailMs: 1000 }
-const EXIT = { ok: 0, pulsed: 1, 'open-at-rest': 1, flash: 1, usage: 2, 'not-visible': 4, 'wrong-scene': 5 }
+const EXIT = { ok: 0, pulsed: 1, 'open-at-rest': 1, flash: 1, usage: 2, 'not-visible': 4, 'wrong-scene': 5, 'low-rate': 6, 'late-start': 1, vanished: 1, 'startup-pulse': 1, 'wrong-box': 1, 'wrong-size': 1, unstable: 1 }
 
 export function parseFrames(csv) {
     const frames = []
@@ -126,6 +127,123 @@ function restOf(frames) {
     }
 }
 
+// Cena (--scene): medidas em tools/real-app/scenes.json, ao lado de tools/ci (caminho por import.meta.url).
+const SCENES_PATH = fileURLToPath(new URL('../real-app/scenes.json', import.meta.url))
+const LOW_RATE_FRAMES = 150
+const MAX_GAP_MS = 1000
+const STARTUP_WINDOW_MS = 2000
+const REST_WINDOW_END_MS = 7000
+const STARTUP_TOLERANCE = 1.05
+const BOX_TOLERANCE_PX = 2
+const SIZE_TOLERANCE = 0.02
+const LANDING_TOLERANCE_PX = 8
+const PARKED_AFTER_LEAVE_MS = 2500
+const PARKED_BEFORE_PRESS_MS = 600
+const SETTLE_AFTER_RELEASE_MS = 4000
+
+// Problema de cena ({ verdict, motivo }) ou null. Ordem: low-rate, vanished, startup-pulse, wrong-box, wrong-size, unstable.
+// t0 = primeiro quadro com foreground >= minForeground. Chamada so quando o veredito atual e ok.
+export function sceneProblem(frames, { scene, expect, events }) {
+    const { rest: reference, startupMax } = sceneNamed(scene)
+    const first = frames.find((frame) => frame.foreground >= DEFAULTS.minForeground)
+    if (!first) return null
+    const t0 = first.tMs
+    const after = frames.filter((frame) => frame.tMs > t0)
+    return lowRateProblem(after, t0)
+        ?? lateStartProblem(t0)
+        ?? vanishedProblem(after)
+        ?? startupProblem(frames, startupMax, t0)
+        ?? boxProblem(frames, reference, t0)
+        ?? sizeProblem(frames, reference, t0)
+        ?? unstableProblem(frames, reference, t0, { expect, events })
+}
+
+function verdictWith(verdict, motivo) {
+    return { verdict, motivo }
+}
+
+function sceneNamed(name) {
+    const scenes = JSON.parse(readFileSync(SCENES_PATH, 'utf8'))
+    if (!Object.hasOwn(scenes, name)) throw new Error(`uso: --scene desconhecido "${name}"; cenas: ${Object.keys(scenes).join(', ')}`)
+    return scenes[name]
+}
+
+function lowRateProblem(after, t0) {
+    if (after.length < LOW_RATE_FRAMES) return verdictWith('low-rate', `${after.length} quadros depois de t0, esperado >= ${LOW_RATE_FRAMES}`)
+    let previous = t0
+    for (const frame of after) {
+        const gap = frame.tMs - previous
+        if (gap > MAX_GAP_MS) return verdictWith('low-rate', `intervalo de ${gap} ms ate t=${frame.tMs} ms, esperado <= ${MAX_GAP_MS} ms`)
+        previous = frame.tMs
+    }
+    return null
+}
+
+// Primeira aparicao depois de LATE_START_MS da gravacao: real tem no maximo 20,7 s (566 gravacoes).
+const LATE_START_MS = 30000
+
+function lateStartProblem(t0) {
+    if (t0 <= LATE_START_MS) return null
+    return verdictWith('late-start', `primeiro quadro visivel em t=${t0} ms (esperado <= ${LATE_START_MS} ms)`)
+}
+
+function vanishedProblem(after) {
+    const frame = after.find((item) => item.foreground < DEFAULTS.minForeground)
+    if (!frame) return null
+    return verdictWith('vanished', `t=${frame.tMs} ms com foreground ${frame.foreground} (esperado >= ${DEFAULTS.minForeground})`)
+}
+
+function startupProblem(frames, startupMax, t0) {
+    const limit = startupMax * STARTUP_TOLERANCE
+    const frame = frames.find((item) => item.tMs >= t0 && item.tMs <= t0 + STARTUP_WINDOW_MS && item.foreground > limit)
+    if (!frame) return null
+    return verdictWith('startup-pulse', `t=${frame.tMs} ms com foreground ${frame.foreground} (esperado <= ${limit.toFixed(0)})`)
+}
+
+// Janela de repouso: t0 + 2 s ate t0 + 7 s.
+function restWindow(frames, t0) {
+    return frames.filter((frame) => frame.tMs >= t0 + STARTUP_WINDOW_MS && frame.tMs <= t0 + REST_WINDOW_END_MS)
+}
+
+function boxProblem(frames, reference, t0) {
+    const rest = restWindow(frames, t0)
+    if (rest.length === 0) return null
+    const field = ['x', 'y', 'w', 'h'].find((key) => Math.abs(median(rest.map((item) => item[key])) - reference[key]) > BOX_TOLERANCE_PX)
+    if (field === undefined) return null
+    const measured = median(rest.map((item) => item[field]))
+    return verdictWith('wrong-box', `mediana de ${field} ${measured} (esperado ${reference[field]} ± ${BOX_TOLERANCE_PX} px)`)
+}
+
+function sizeProblem(frames, reference, t0) {
+    const rest = restWindow(frames, t0)
+    if (rest.length === 0) return null
+    const measured = median(rest.map((item) => item.foreground))
+    if (Math.abs(measured - reference.foreground) <= reference.foreground * SIZE_TOLERANCE) return null
+    return verdictWith('wrong-size', `mediana de foreground ${measured} (esperado ${reference.foreground} ± 2%)`)
+}
+
+// Quadro parado: idle = tudo a partir de t0 + 2 s; hover = antes de entrar ou depois de sair + 2,5 s; drag = antes do aperto - 600 ms ou apos soltar + 4 s.
+function isParked(tMs, t0, expect, events) {
+    if (tMs < t0 + STARTUP_WINDOW_MS) return false
+    if (expect === 'hover') return tMs < events.enterMs || tMs > events.leaveMs + PARKED_AFTER_LEAVE_MS
+    if (expect === 'drag') return tMs < events.pressMs - PARKED_BEFORE_PRESS_MS || tMs >= events.releaseMs + SETTLE_AFTER_RELEASE_MS
+    return true
+}
+
+function unstableProblem(frames, reference, t0, { expect, events }) {
+    for (const frame of frames) {
+        if (!isParked(frame.tMs, t0, expect, events)) continue
+        const settled = expect === 'drag' && frame.tMs >= events.releaseMs + SETTLE_AFTER_RELEASE_MS
+        const landing = settled ? { x: reference.x + events.dx, y: reference.y + events.dy } : { x: reference.x, y: reference.y }
+        const positionTolerance = settled ? LANDING_TOLERANCE_PX : BOX_TOLERANCE_PX
+        const expected = { x: landing.x, y: landing.y, w: reference.w, h: reference.h, foreground: reference.foreground }
+        const limits = { x: positionTolerance, y: positionTolerance, w: BOX_TOLERANCE_PX, h: BOX_TOLERANCE_PX, foreground: reference.foreground * SIZE_TOLERANCE }
+        const field = Object.keys(expected).find((key) => Math.abs(frame[key] - expected[key]) > limits[key])
+        if (field !== undefined) return verdictWith('unstable', `t=${frame.tMs} ms com ${field} ${frame[field]} (esperado ${expected[field]} ± ${limits[field]})`)
+    }
+    return null
+}
+
 function closeRun(pulses, run, minFrames) {
     if (run.length < minFrames) return
     pulses.push({
@@ -160,7 +278,7 @@ function median(values) {
 }
 
 const USAGE = 'uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events \'{"enterMs":n,"leaveMs":n}\']'
-const VALUE_FLAGS = ['--expect', '--events', '--rise-ratio', '--min-rest-width', '--max-rest-foreground', '--max-foreground']
+const VALUE_FLAGS = ['--expect', '--events', '--rise-ratio', '--min-rest-width', '--max-rest-foreground', '--max-foreground', '--scene']
 const REST_FROM_MS = 2000
 const REST_UNTIL_MS = 7000
 
@@ -183,6 +301,7 @@ function parseArgs(argv) {
         minRestWidth: parsePositiveInteger('--min-rest-width', flags['--min-rest-width']),
         maxRestForeground: parsePositiveInteger('--max-rest-foreground', flags['--max-rest-foreground']),
         maxForeground: parsePositiveInteger('--max-foreground', flags['--max-foreground']),
+        scene: flags['--scene'],
     }
     if (flags['--expect'] === undefined) {
         if (flags['--events'] !== undefined) throw new Error(USAGE)
@@ -231,11 +350,6 @@ function parseDragEvents(text) {
     return { pressMs, releaseMs, dx, dy }
 }
 
-function printVerdict(verdict, result) {
-    console.log(verdict)
-    result.pulses.forEach((pulse) => console.log(`pulso ${pulse.startMs}-${pulse.endMs} pico ${pulse.peakForeground}`))
-}
-
 // Largura do repouso: mediana de w dos quadros visiveis entre +2 s e +7 s da primeira aparicao (relativo, nao ao processo). Sem quadro nessa janela: null.
 function restWidth(frames) {
     const first = frames.find((frame) => frame.foreground >= DEFAULTS.minForeground)
@@ -258,52 +372,57 @@ function isOpenAtRest(rest, maxRestForeground) {
     return maxRestForeground !== undefined && rest !== null && rest > maxRestForeground
 }
 
-function printOpenAtRest() {
-    console.log('open-at-rest')
-    return EXIT['open-at-rest']
-}
-
-// Flash: veredito antes de open-at-rest; uma linha por quadro acima do maximo, na ordem da gravacao.
-function printFlash(flashes) {
-    console.log('flash')
-    flashes.forEach((frame) => console.log(`quadro ${frame.tMs} ${frame.foreground}`))
-    return EXIT.flash
-}
-
 // Arrasto: mediana dos visiveis antes do aperto (mesma janela de dragVerdict: 3 s antes de apertar).
 function dragRestForeground(frames, pressMs) {
     const before = frames.filter((frame) => frame.tMs <= pressMs - 3000 && frame.foreground >= DEFAULTS.minForeground)
     return before.length === 0 ? null : median(before.map((frame) => frame.foreground))
 }
 
-function main(argv) {
-    const { csv, expect, events, riseRatio, minRestWidth, maxRestForeground, maxForeground } = parseArgs(argv)
-    const frames = parseFrames(readFileSync(csv, 'utf8'))
+function hoverExit(verdict) {
+    return verdict === 'ok' ? EXIT.ok : verdict === 'not-visible' ? EXIT['not-visible'] : EXIT.pulsed
+}
+
+// Veredito e linhas de saida, sem imprimir: a cena (--scene) so roda quando este veredito e ok.
+function verdictRun(frames, { expect, events, riseRatio, minRestWidth, maxRestForeground, maxForeground }) {
     const scene = sceneVerdict(frames, minRestWidth)
-    if (scene !== null) {
-        console.log(scene)
-        return EXIT[scene]
-    }
+    if (scene !== null) return { code: EXIT[scene], lines: [scene] }
     const flashes = flashFrames(frames, maxForeground)
-    if (flashes.length > 0) return printFlash(flashes)
+    if (flashes.length > 0) return { code: EXIT.flash, lines: ['flash', ...flashes.map((frame) => `quadro ${frame.tMs} ${frame.foreground}`)] }
     if (expect === 'drag') {
         const verdict = dragVerdict(frames, events)
-        if (verdict !== 'not-visible' && isOpenAtRest(dragRestForeground(frames, events.pressMs), maxRestForeground)) return printOpenAtRest()
-        console.log(verdict)
-        return verdict === 'ok' ? EXIT.ok : verdict === 'not-visible' ? EXIT['not-visible'] : EXIT.pulsed
+        if (verdict !== 'not-visible' && isOpenAtRest(dragRestForeground(frames, events.pressMs), maxRestForeground)) {
+            return { code: EXIT['open-at-rest'], lines: ['open-at-rest'] }
+        }
+        return { code: hoverExit(verdict), lines: [verdict] }
     }
     const restBeforeMs = expect === 'hover' ? events.enterMs : undefined
     const options = { ...(riseRatio === undefined ? {} : { riseRatio }), restBeforeMs }
     const result = detectPulses(frames, options)
-    if (isOpenAtRest(result.restForeground, maxRestForeground)) return printOpenAtRest()
+    if (isOpenAtRest(result.restForeground, maxRestForeground)) return { code: EXIT['open-at-rest'], lines: ['open-at-rest'] }
+    const pulseLines = result.pulses.map((pulse) => `pulso ${pulse.startMs}-${pulse.endMs} pico ${pulse.peakForeground}`)
     if (expect === 'hover') {
         const verdict = hoverVerdict(result, events)
-        printVerdict(verdict, result)
-        return verdict === 'ok' ? EXIT.ok : verdict === 'not-visible' ? EXIT['not-visible'] : EXIT.pulsed
+        return { code: hoverExit(verdict), lines: [verdict, ...pulseLines] }
     }
     const verdict = verdictOf(result)
-    printVerdict(verdict, result)
-    return EXIT[verdict]
+    return { code: EXIT[verdict], lines: [verdict, ...pulseLines] }
+}
+
+function main(argv) {
+    const args = parseArgs(argv)
+    if (args.scene !== undefined) sceneNamed(args.scene)
+    const frames = parseFrames(readFileSync(args.csv, 'utf8'))
+    const run = verdictRun(frames, args)
+    const problem = run.code === EXIT.ok && args.scene !== undefined
+        ? sceneProblem(frames, { scene: args.scene, expect: args.expect, events: args.events })
+        : null
+    if (problem === null) {
+        run.lines.forEach((line) => console.log(line))
+        return run.code
+    }
+    console.log(problem.verdict)
+    console.log(`motivo: ${problem.motivo}`)
+    return EXIT[problem.verdict]
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

@@ -79,12 +79,19 @@ test('runScript devolve checks, coverage e missing; missing cita o item de cober
     assert.match(JSON.stringify(result.missing), /gear/);
 });
 
-test('zoom: retângulo inteiro dentro da tela, w e h entre 16 e metade da tela', () => {
-    assert.equal(validateAction('zoom', { x: 0, y: 0, w: 500, h: 400 }, SCREEN).ok, true);
-    assert.equal(validateAction('zoom', { x: 900, y: 0, w: 200, h: 100 }, SCREEN).ok, false);
-    assert.equal(validateAction('zoom', { x: 0, y: 0, w: 10, h: 100 }, SCREEN).ok, false);
-    assert.equal(validateAction('zoom', { x: 0, y: 0, w: 600, h: 100 }, SCREEN).ok, false);
-    assert.equal(validateAction('zoom', { x: 0, y: 0, w: 100, h: 500 }, SCREEN).ok, false);
+test('zoom: limites exatos em 1024x768: 16 <= w <= 1024, 16 <= h <= 768, retângulo dentro da tela', () => {
+    const screen = { width: 1024, height: 768 };
+    const accepted = [{ x: 0, y: 0, w: 16, h: 16 }, { x: 0, y: 0, w: 1024, h: 768 }, { x: 1008, y: 752, w: 16, h: 16 }, { x: 0, y: 0, w: 600, h: 100 }, { x: 0, y: 0, w: 100, h: 500 }];
+    const refused = [{ x: 0, y: 0, w: 15, h: 16 }, { x: 0, y: 0, w: 16, h: 15 }, { x: 0, y: 0, w: 1025, h: 16 }, { x: 0, y: 0, w: 16, h: 769 }, { x: 1, y: 0, w: 1024, h: 16 }];
+    for (const rect of accepted) assert.equal(validateAction('zoom', rect, screen).ok, true, JSON.stringify(rect));
+    for (const rect of refused) assert.equal(validateAction('zoom', rect, screen).ok, false, JSON.stringify(rect));
+});
+
+test('zoom recusado diz o recebido e o permitido', () => {
+    assert.equal(
+        validateAction('zoom', { x: 0, y: 0, w: 1025, h: 430 }, { width: 1024, height: 768 }).error,
+        'campo inválido em zoom: x, y, w e h inteiros; retângulo dentro da tela; recebido x=0 y=0 w=1025 h=430; permitido 16 <= w <= 1024 e 16 <= h <= 768',
+    );
 });
 
 test('check: rule 1..9, verdict do enum, shot obrigatória exceto not_seen com seen', () => {
@@ -215,7 +222,7 @@ test('cover de minimize sem clique entre as capturas é recusado', async () => {
     assert.deepEqual(result.coverage, []);
 });
 
-test('cover recusa capturas com imagens iguais', async () => {
+test('cover normal aceita imagens iguais quando a última ação de ponteiro está entre as capturas', async () => {
     const same = { ...fakeDriver(), async screenshot() { return 'SAME'; } };
     const client = scripted([
         reply([call('s2', 'screenshot', {})]),
@@ -224,8 +231,62 @@ test('cover recusa capturas com imagens iguais', async () => {
         reply([call('c', 'cover', { item: 'gear', before: 2, after: 3, seen: 'engrenagem' })]),
         reply([call('d', 'done', { summary: 'fim' })]),
     ]);
-    await runScript({ client, driver: same, script: 'roteiro', rules: 'regras', screen: SCREEN, budget: createBudget(), coverage: ['gear'] });
-    assert.match(toolContents(client.calls[4]).at(-1), /imagens iguais/);
+    const result = await runScript({ client, driver: same, script: 'roteiro', rules: 'regras', screen: SCREEN, budget: createBudget(), coverage: ['gear'] });
+    assert.deepEqual(result.coverage, [{ item: 'gear', before: 2, after: 3, seen: 'engrenagem' }]);
+});
+
+test('cover não aceita ação de ponteiro anterior à captura inicial', async () => {
+    const client = scripted([
+        reply([call('m', 'click', { x: 10, y: 10 })]),
+        reply([call('s2', 'screenshot', {})]),
+        reply([call('s3', 'screenshot', {})]),
+        reply([call('c', 'cover', { item: 'gear', before: 2, after: 3, seen: 'engrenagem' })]),
+        reply([call('d', 'done', { summary: 'fim' })]),
+    ]);
+    const result = await runScript({ client, driver: fakeDriver(), script: 'roteiro', rules: 'regras', screen: SCREEN, budget: createBudget(), coverage: ['gear'] });
+    assert.match(toolContents(client.calls[4]).at(-1), /ação entre as capturas 2 e 3/);
+    assert.deepEqual(result.coverage, []);
+});
+
+test('cover recusa captura inteira depois da última ação de ponteiro', async () => {
+    const client = scripted([
+        reply([call('s2', 'screenshot', {})]),
+        reply([call('m', 'click', { x: 10, y: 10 })]),
+        reply([call('s3', 'screenshot', {})]),
+        reply([call('s4', 'screenshot', {})]),
+        reply([call('c', 'cover', { item: 'gear', before: 2, after: 4, seen: 'engrenagem' })]),
+        reply([call('d', 'done', { summary: 'fim' })]),
+    ]);
+    const result = await runScript({ client, driver: fakeDriver(), script: 'roteiro', rules: 'regras', screen: SCREEN, budget: createBudget(), coverage: ['gear'] });
+    assert.match(toolContents(client.calls[5]).at(-1), /depois da última ação/);
+    assert.deepEqual(result.coverage, []);
+});
+
+test('cover aceita recorte de zoom entre a ação de ponteiro e a captura de depois', async () => {
+    const client = scripted([
+        reply([call('s2', 'screenshot', {})]),
+        reply([call('m', 'click', { x: 10, y: 10 })]),
+        reply([call('z', 'zoom', { x: 0, y: 0, w: 100, h: 100 })]),
+        reply([call('s4', 'screenshot', {})]),
+        reply([call('c', 'cover', { item: 'gear', before: 2, after: 4, seen: 'engrenagem' })]),
+        reply([call('d', 'done', { summary: 'fim' })]),
+    ]);
+    const result = await runScript({ client, driver: fakeDriver(), script: 'roteiro', rules: 'regras', screen: SCREEN, budget: createBudget(), coverage: ['gear'] });
+    assert.deepEqual(result.coverage, [{ item: 'gear', before: 2, after: 4, seen: 'engrenagem' }]);
+});
+
+test('cover do mesmo item já aceito é recusado', async () => {
+    const client = scripted([
+        reply([call('s2', 'screenshot', {})]),
+        reply([call('m', 'click', { x: 10, y: 10 })]),
+        reply([call('s3', 'screenshot', {})]),
+        reply([call('c1', 'cover', { item: 'gear', before: 2, after: 3, seen: 'engrenagem' })]),
+        reply([call('c2', 'cover', { item: 'gear', before: 2, after: 3, seen: 'de novo' })]),
+        reply([call('d', 'done', { summary: 'fim' })]),
+    ]);
+    const result = await runScript({ client, driver: fakeDriver(), script: 'roteiro', rules: 'regras', screen: SCREEN, budget: createBudget(), coverage: ['gear'] });
+    assert.match(toolContents(client.calls[5]).at(-1), /já aceito/);
+    assert.deepEqual(result.coverage, [{ item: 'gear', before: 2, after: 3, seen: 'engrenagem' }]);
 });
 
 test('cover recusa captura de zoom como antes ou depois', async () => {

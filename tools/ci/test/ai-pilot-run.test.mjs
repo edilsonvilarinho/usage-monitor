@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { childEnv, parseArgs, planEvidence, renderReport, runDry, runPaid } from '../ai-pilot-run.mjs';
+import { childEnv, exitCodeOf, parseArgs, parseJobs, planBudget, planEvidence, planRun, renderReport, runDry, runPaid } from '../ai-pilot-run.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REAL_APP = resolve(HERE, '..', '..', 'real-app');
@@ -76,6 +76,38 @@ test('parseArgs recusa opção obrigatória ausente, modo ou lado fora da lista 
 });
 
 // Modo dry ----------------------------------------------------------------
+
+const PLAN_CASES = { 'gear-balloon': { badTag: 'v1.0.0', goodTag: 'v1.1.0' }, script: 'roteiro', coverage: [] };
+
+test('planRun recusa caso desconhecido e chave que não é caso, com saída 2', () => {
+    assert.deepEqual(planRun({ caseId: 'nada', side: 'bad', mode: 'dry' }, PLAN_CASES, {}), { ok: false, error: 'caso desconhecido: nada', exit: 2 });
+    assert.equal(planRun({ caseId: 'script', side: 'bad', mode: 'dry' }, PLAN_CASES, {}).ok, false);
+    assert.equal(planRun({ caseId: 'coverage', side: 'bad', mode: 'dry' }, PLAN_CASES, {}).ok, false);
+});
+
+test('planRun escolhe badTag para o lado bad e goodTag para o lado good', () => {
+    assert.equal(planRun({ caseId: 'gear-balloon', side: 'bad', mode: 'dry' }, PLAN_CASES, {}).version, 'v1.0.0');
+    assert.equal(planRun({ caseId: 'gear-balloon', side: 'good', mode: 'dry' }, PLAN_CASES, {}).version, 'v1.1.0');
+});
+
+test('planRun pago sem OPENROUTER_API_KEY recusa com saída 2 e com a chave passa', () => {
+    assert.deepEqual(planRun({ caseId: 'gear-balloon', side: 'bad', mode: 'paid' }, PLAN_CASES, {}), { ok: false, error: 'OPENROUTER_API_KEY ausente', exit: 2 });
+    assert.equal(planRun({ caseId: 'gear-balloon', side: 'bad', mode: 'paid' }, PLAN_CASES, { OPENROUTER_API_KEY: 'k' }).ok, true);
+});
+
+test('parseJobs aceita inteiro maior que 0 e recusa ausente, zero, fracionário e texto', () => {
+    assert.equal(parseJobs(['--jobs', '3']), 3);
+    assert.equal(parseJobs(['--jobs', '1']), 1);
+    assert.equal(parseJobs(['--plan-budget']), null);
+    assert.equal(parseJobs(['--jobs', '0']), null);
+    assert.equal(parseJobs(['--jobs', '1.5']), null);
+    assert.equal(parseJobs(['--jobs', 'x']), null);
+});
+
+test('exitCodeOf: só done é 0; roteiro sem done aceito é 4', () => {
+    assert.equal(exitCodeOf('done'), 0);
+    for (const stop of ['done-incomplete', 'max-steps', 'no-tool-call']) assert.equal(exitCodeOf(stop), 4);
+});
 
 test('runDry recusa a lista inteira quando uma ação é inválida, antes de executar qualquer uma', async () => {
     const driver = fakeDriver();
@@ -343,4 +375,53 @@ test('laço e confirmações juntos não passam de maxScriptUsd: confirmação c
     assert.equal(result.reports[0].why, 'script-budget');
     assert.equal(client.calls.verdict, 0);
     assert.ok(result.costUsd <= 0.2 + 1e-9);
+});
+
+// Mutantes sobreviventes (#676, item 6b): limites exatos, detalhe e gasto da chave.
+test('parseArgs recusa flag sem valor no fim, com a mensagem de valor ausente', () => {
+    assert.deepEqual(parseArgs([...FULL_ARGV, '--out']), { ok: false, error: 'valor ausente para --out' });
+});
+
+test('planBudget aceita exatamente no teto com a tolerância de 1e-9 e recusa acima dela', () => {
+    assert.deepEqual(planBudget({ ledgerUsd: 0, jobs: 1, maxScriptUsd: 5 + 1e-9, maxPilotUsd: 5 }), { ok: true, worstCaseUsd: 5 + 1e-9 });
+    assert.equal(planBudget({ ledgerUsd: 0, jobs: 1, maxScriptUsd: 5 + 2e-9, maxPilotUsd: 5 }).ok, false);
+});
+
+test('runPaid copia o detalhe do roteiro só quando ele existe', async () => {
+    const failing = await runPaid({
+        fetchKey: fakeFetchKey(keyBody(0.2), keyBody(0.3)),
+        makeClient: () => ({ complete: async () => { throw new Error('rede caiu'); } }),
+        driver: fakeDriver(), script: SCRIPT, rules: RULES, screen: SCREEN,
+    });
+    assert.equal(failing.stop, 'client-error');
+    assert.equal(failing.detail, 'rede caiu');
+    const done = await runPaid({
+        fetchKey: fakeFetchKey(keyBody(0.2), keyBody(0.3)),
+        makeClient: () => fakeClient([reply([...ALL_OK, call('1', 'done', { summary: 'ok' })])]),
+        driver: fakeDriver(), script: SCRIPT, rules: RULES, screen: SCREEN,
+    });
+    assert.equal('detail' in done, false);
+});
+
+test('runPaid lê o gasto final como null quando não é número finito e quando a leitura falha', async () => {
+    const bodies = [{ data: { limit: null, limit_remaining: null, usage: '0.5' } }, { data: { limit: null, limit_remaining: null, usage: Infinity } }];
+    for (const body of bodies) {
+        const result = await runPaid({
+            fetchKey: fakeFetchKey(keyBody(0.2), body),
+            makeClient: () => fakeClient([reply([...ALL_OK, call('1', 'done', { summary: 'ok' })])]),
+            driver: fakeDriver(), script: SCRIPT, rules: RULES, screen: SCREEN,
+        });
+        assert.equal(result.keyUsageAfter, null);
+    }
+    let reads = 0;
+    const failed = await runPaid({
+        fetchKey: async () => {
+            reads += 1;
+            if (reads === 1) return keyBody(0.2);
+            throw new Error('rede');
+        },
+        makeClient: () => fakeClient([reply([...ALL_OK, call('1', 'done', { summary: 'ok' })])]),
+        driver: fakeDriver(), script: SCRIPT, rules: RULES, screen: SCREEN,
+    });
+    assert.equal(failed.keyUsageAfter, null);
 });

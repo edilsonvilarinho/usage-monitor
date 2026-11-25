@@ -15,6 +15,131 @@ const OPEN = 13000
 const dir = mkdtempSync(join(tmpdir(), 'hud-pulses-'))
 after(() => rmSync(dir, { recursive: true, force: true }))
 
+// Arrasto: caixa em repouso ate o aperto e caixa pousada depois do soltar (move dx, dy com centro x + w/2, y + h/2).
+const SPOT = { x: 10, y: 10, w: 200, h: 100 }
+const LANDED = { x: -220, y: 100, w: 260, h: 160 }
+const DRAG_EVENTS = { pressMs: 5000, releaseMs: 5500, dx: -200, dy: 120 }
+
+// Quadros de 50 ms ate 12 s; antes do soltar a caixa e SPOT, depois e landed.
+function dragTrace(foreground, landed = LANDED) {
+    const frames = []
+    for (let tMs = 0; tMs <= 12000; tMs += 50) {
+        const box = tMs < DRAG_EVENTS.releaseMs ? SPOT : landed
+        frames.push({ tMs, foreground: foreground(tMs), ...box })
+    }
+    return frames
+}
+
+test('limiar de subida: 1,51x e pulso; 1,5x exato nao (comparacao estrita)', () => {
+    assert.equal(detectPulses(series(12000, (t) => (t >= 3000 && t < 3600 ? 1510 : HUD))).pulses.length, 1)
+    assert.deepEqual(detectPulses(series(12000, (t) => (t >= 3000 && t < 3600 ? 1500 : HUD))).pulses, [])
+})
+
+test('run de 2 quadros e pulso; 1 quadro nao (minFrames)', () => {
+    const two = detectPulses(series(12000, (t) => (t === 3000 || t === 3050 ? PULSE : HUD)))
+    assert.deepEqual(two.pulses, [{ startMs: 3000, endMs: 3050, peakForeground: PULSE }])
+    assert.deepEqual(detectPulses(series(12000, (t) => (t === 3000 ? PULSE : HUD))).pulses, [])
+})
+
+test('exatamente minFrames quadros depois do settle: avalia, appeared true, ok', () => {
+    const result = detectPulses(series(2050, () => HUD))
+    assert.equal(result.appeared, true)
+    assert.equal(verdictOf(result), 'ok')
+})
+
+test('foreground exatamente minForeground (400) e visivel', () => {
+    assert.equal(verdictOf(detectPulses(series(12000, () => 400))), 'ok')
+})
+
+test('mediana dos quadros depois do settle abaixo do minimo: not-visible com appeared true', () => {
+    const result = detectPulses(series(12000, (t) => (t < 1000 || t >= 11000 ? 400 : 100)))
+    assert.equal(result.appeared, true)
+    assert.equal(verdictOf(result), 'not-visible')
+})
+
+test('queda pontual na cauda com visivel no resto da cauda: ok', () => {
+    assert.equal(verdictOf(detectPulses(series(12000, (t) => (t >= 11000 && t < 11100 ? 0 : HUD)))), 'ok')
+})
+
+test('app some no meio da gravacao: appeared true', () => {
+    assert.equal(detectPulses(series(12000, (t) => (t < 6000 ? HUD : 0))).appeared, true)
+})
+
+test('pico do pulso e o maior quadro do run, nao o minimo', () => {
+    const frames = series(12000, (t) => (t === 3050 ? 1800 : t === 3000 || t === 3100 ? 1600 : HUD))
+    assert.deepEqual(detectPulses(frames).pulses[0], { startMs: 3000, endMs: 3100, peakForeground: 1800 })
+})
+
+test('hover: pulso que abre exatamente em enterMs nao e extra', () => {
+    const events = { enterMs: 3000, leaveMs: 6000 }
+    const result = detectPulses(series(12000, (t) => (t >= 3000 && t < 5550 ? PULSE : HUD)), { restBeforeMs: events.enterMs })
+    assert.equal(hoverVerdict(result, events), 'ok')
+})
+
+test('hover: abertura em enterMs + 1500 e no prazo; + 1501 e atrasada', () => {
+    const frames = series(12000, (t) => (t >= 4500 && t < 5100 ? PULSE : HUD))
+    assert.equal(hoverVerdict(detectPulses(frames, { restBeforeMs: 3000 }), { enterMs: 3000, leaveMs: 6000 }), 'ok')
+    assert.equal(hoverVerdict(detectPulses(frames, { restBeforeMs: 2999 }), { enterMs: 2999, leaveMs: 6000 }), 'opened-late')
+})
+
+test('hover: fim em leaveMs + 2500 exato fecha; um quadro depois nao', () => {
+    const frames = series(12000, (t) => (t >= 3000 && t < 5550 ? PULSE : HUD))
+    assert.equal(hoverVerdict(detectPulses(frames, { restBeforeMs: 2999 }), { enterMs: 2999, leaveMs: 3000 }), 'ok')
+    assert.notEqual(hoverVerdict(detectPulses(frames, { restBeforeMs: 2999 }), { enterMs: 2999, leaveMs: 2999 }), 'ok')
+})
+
+test('arrasto: caixa pousada com w/h diferentes do repouso mede centro x + w/2, y + h/2: ok', () => {
+    assert.equal(dragVerdict(dragTrace(() => HUD), DRAG_EVENTS), 'ok')
+})
+
+test('arrasto: foreground exatamente minForeground (400) e visivel', () => {
+    assert.equal(dragVerdict(dragTrace(() => 400), DRAG_EVENTS), 'ok')
+})
+
+test('arrasto: unico quadro visivel exatamente em pressMs - 3000 basta', () => {
+    assert.equal(dragVerdict(dragTrace((t) => (t === 2000 || t >= 9500 ? HUD : 0)), DRAG_EVENTS), 'ok')
+})
+
+test('arrasto: sem visivel ate pressMs - 3000 (visivel so depois do aperto): not-visible', () => {
+    assert.equal(dragVerdict(dragTrace((t) => ((t >= 3000 && t < 9000) || t >= 9500 ? HUD : 0)), DRAG_EVENTS), 'not-visible')
+})
+
+test('arrasto: quadro visivel exatamente em releaseMs + 4000 conta', () => {
+    assert.equal(dragVerdict(dragTrace((t) => (t <= 2000 || t === 9500 ? HUD : 0)), DRAG_EVENTS), 'ok')
+})
+
+test('arrasto: deslocamento de 8 px exatos na tolerancia conta', () => {
+    assert.equal(dragVerdict(dragTrace(() => HUD, { x: -212, y: 100, w: 260, h: 160 }), DRAG_EVENTS), 'ok')
+})
+
+test('arrasto: 8 px exatos sem deslocar o alvo: not-moved', () => {
+    assert.equal(dragVerdict(dragTrace(() => HUD, { x: -12, y: -20, w: 260, h: 160 }), DRAG_EVENTS), 'not-moved')
+})
+
+test('arrasto: mediana par dos visiveis antes do aperto (1000 e 1200 = 1100) nao abre com --max-rest-foreground 1100', () => {
+    const frames = dragTrace((t) => (t === 1950 ? HUD : t === 2000 ? 1200 : t >= 9500 ? HUD : 0))
+    const result = cli(writeCsv('drag-median.csv', toCsv(frames)), '--expect', 'drag', '--events', JSON.stringify(DRAG_EVENTS), '--max-rest-foreground', '1100')
+    assert.doesNotMatch(String(result.stdout), /open-at-rest/)
+})
+
+test('p5 do repouso: 1 quadro de 1200 em 2 quadros nao sobe o repouso (rank 1 = menor); 1100 nao abre', () => {
+    const result = cli(writeCsv('p5.csv', toCsv(series(2050, (t) => (t === 2050 ? 1200 : HUD)))), '--max-rest-foreground', '1100')
+    assert.doesNotMatch(String(result.stdout), /open-at-rest/)
+})
+
+test('CLI: --events com leave == enter e release == press sao aceitos', () => {
+    const csv = writeCsv('limits.csv', toCsv(threePulses))
+    assert.notEqual(cli(csv, '--expect', 'hover', '--events', '{"enterMs":3000,"leaveMs":3000}').code, 2)
+    assert.notEqual(cli(csv, '--expect', 'drag', '--events', '{"pressMs":5000,"releaseMs":5000,"dx":0,"dy":0}').code, 2)
+})
+
+test('CLI: inteiro positivo aceita 1 e 10; rejeita 0, -5, 1.5, abc e vazio', () => {
+    const csv = writeCsv('positive.csv', toCsv(threePulses))
+    assert.notEqual(cli(csv, '--min-rest-width', '1').code, 2)
+    assert.notEqual(cli(csv, '--min-rest-width', '10').code, 2)
+    for (const value of ['0', '-5', '1.5', 'abc', '']) assert.equal(cli(csv, '--min-rest-width', value).code, 2, value)
+})
+
 // Quadros a cada 50 ms de 0 ate durationMs; valueAt(t) e o foreground do quadro.
 function series(durationMs, valueAt) {
     const frames = []
@@ -567,4 +692,12 @@ test('--max-foreground invalido: uso, codigo 2', () => {
         assert.equal(cli(csv, '--max-foreground', value).code, 2, `--max-foreground "${value}"`)
     }
     assert.equal(cli(csv, '--max-foreground').code, 2)
+})
+
+test('CLI --scene: nome valido passa; desconhecido (inclusive prototipo) ou sem valor: uso, codigo 2', () => {
+    const csv = writeCsv('scene-flag.csv', toCsv(series(12000, () => HUD)))
+    assert.notEqual(cli(csv, '--scene', 'floating-idle').code, 2)
+    assert.equal(cli(csv, '--scene', 'nao-existe').code, 2)
+    assert.equal(cli(csv, '--scene', 'constructor').code, 2)
+    assert.equal(cli(csv, '--scene').code, 2)
 })
