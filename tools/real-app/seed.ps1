@@ -142,6 +142,9 @@ $values = [ordered]@{
     reducedMotion             = 'false'
 }
 if ($isHole) { $values['hudMinimizedAccounts'] = 'CURSOR,ANTIGRAVITY' }
+# Hole scenarios only: they have no credentials, so the first collection would race the cache
+# and drop the accounts. A refresh due in 4 minutes keeps the seeded cache until the run ends.
+if ($isHole) { $values['nextRefreshAtMillis'] = [string]($nowMs + 4 * 60000L) }
 foreach ($name in $values.Keys) {
     # Value strings use the same simple encoding (toWindowsValueString): 'CODEX' -> '/C/O/D/E/X'.
     $regName = ConvertTo-JavaPrefsName $name

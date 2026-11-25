@@ -5,12 +5,13 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { detectPulses, dragVerdict, hoverVerdict, parseFrames, verdictOf } from '../hud-pulses.mjs'
+import { detectPulses, dragVerdict, flashFrames, hoverVerdict, parseFrames, verdictOf } from '../hud-pulses.mjs'
 
 const SCRIPT = fileURLToPath(new URL('../hud-pulses.mjs', import.meta.url))
 const HEADER = 't_ms,foreground,x,y,w,h'
 const HUD = 1000
 const PULSE = 3000
+const OPEN = 13000
 const dir = mkdtempSync(join(tmpdir(), 'hud-pulses-'))
 after(() => rmSync(dir, { recursive: true, force: true }))
 
@@ -304,4 +305,266 @@ test('CLI drag: 0 ok, 1 falha, 4 nunca visivel, 2 uso', () => {
     assert.equal(cli(csv, '--expect', 'drag', '--events', '{"pressMs":5000,"releaseMs":4000,"dx":-200,"dy":120}').code, 2)
     assert.equal(cli(csv, '--expect', 'drag', '--events', '{"pressMs":5000,"releaseMs":5500,"dx":-200}').code, 2)
     assert.equal(cli(csv, '--expect', 'drag', '--events', 'nao e json').code, 2)
+})
+
+// Escala da cena (--min-rest-width): mediana de w entre +2 s e +7 s da primeira aparicao.
+const SCENE = ['--min-rest-width', '300']
+const withWidth = (frames, widthAt) => frames.map((frame) => ({ ...frame, w: widthAt(frame.tMs) }))
+const hoverAt = (fromMs, toMs, value) => series(12000, (t) => (t >= fromMs && t < toMs ? value : HUD))
+
+test('min-rest-width: repouso estreito e wrong-scene no padrao, no hover e no arrasto, com codigo 5', () => {
+    const narrowHud = withWidth(series(12000, () => HUD), () => 100)
+    const byDefault = cli(writeCsv('scene-default.csv', toCsv(narrowHud)), ...SCENE)
+    assert.equal(byDefault.code, 5)
+    assert.equal(byDefault.stdout.split('\n')[0], 'wrong-scene')
+
+    const narrowHover = withWidth(hoverPulse(4500, 7000), () => 100)
+    const hover = cli(writeCsv('scene-hover.csv', toCsv(narrowHover)), '--expect', 'hover', '--events', JSON.stringify(HOVER), ...SCENE)
+    assert.equal(hover.code, 5)
+    assert.equal(hover.stdout.split('\n')[0], 'wrong-scene')
+
+    const narrowDrag = withWidth(floatingDrag(), () => 100)
+    const drag = cli(writeCsv('scene-drag.csv', toCsv(narrowDrag)), '--expect', 'drag', '--events', JSON.stringify(DRAG), ...SCENE)
+    assert.equal(drag.code, 5)
+    assert.equal(drag.stdout.split('\n')[0], 'wrong-scene')
+})
+
+test('min-rest-width: largura igual ao minimo passa', () => {
+    const exact = cli(writeCsv('scene-exact.csv', toCsv(withWidth(series(12000, () => HUD), () => 300))), ...SCENE)
+    assert.equal(exact.code, 0)
+    assert.equal(exact.stdout.split('\n')[0], 'ok')
+})
+
+test('min-rest-width: quadros depois de +7 s da primeira aparicao nao entram na mediana', () => {
+    // 30 s, primeira aparicao em 0: 101 quadros na janela (100 px) e 460 depois de 7 s (300 px). Se o corte falhasse, a mediana seria 300.
+    const wideAfter = withWidth(series(30000, () => HUD), (tMs) => (tMs > 7000 ? 300 : 100))
+    const run = cli(writeCsv('scene-after.csv', toCsv(wideAfter)), ...SCENE)
+    assert.equal(run.code, 5)
+    assert.equal(run.stdout.split('\n')[0], 'wrong-scene')
+})
+
+test('min-rest-width: sem quadro visivel na janela de +2 s a +7 s da primeira aparicao: not-visible, codigo 4', () => {
+    // Primeira aparicao em 10 s; a serie termina em 11 s, antes de 12 s (+2 s). Janela sem quadro.
+    const lateStart = withWidth(series(11000, (t) => (t >= 10000 ? HUD : 0)), () => 300)
+    const run = cli(writeCsv('scene-late-start.csv', toCsv(lateStart)), ...SCENE)
+    assert.equal(run.code, 4)
+    assert.equal(run.stdout.split('\n')[0], 'not-visible')
+})
+
+// Janela do repouso relativa a primeira aparicao: [+2 s, +7 s]. Quadro de 50 ms mais proximo de 13,236 s.
+const FIRST_VISIBLE_MS = 13250
+const appearsLate = (widthAt) => withWidth(series(30000, (t) => (t >= FIRST_VISIBLE_MS ? HUD : 0)), widthAt)
+
+test('min-rest-width: HUD aparece em 13,25 s com 357 px: ok (janela relativa, nao fixa)', () => {
+    const run = cli(writeCsv('scene-late-first.csv', toCsv(appearsLate(() => 357))), ...SCENE)
+    assert.equal(run.code, 0)
+    assert.equal(run.stdout.split('\n')[0], 'ok')
+})
+
+test('min-rest-width: HUD aparece em 13,25 s com 100 px: wrong-scene dentro de +2 s a +7 s', () => {
+    const run = cli(writeCsv('scene-late-narrow.csv', toCsv(appearsLate(() => 100))), ...SCENE)
+    assert.equal(run.code, 5)
+    assert.equal(run.stdout.split('\n')[0], 'wrong-scene')
+})
+
+test('min-rest-width: quadros depois de +7 s da primeira aparicao nao entram na mediana', () => {
+    // Janela 15,25 s a 20,25 s: 300 px. Depois de 20,25 s: 100 px (195 quadros). Corte fixo ou sem teto daria wrong-scene.
+    const wideWindow = appearsLate((tMs) => (tMs >= FIRST_VISIBLE_MS + 2000 && tMs <= FIRST_VISIBLE_MS + 7000 ? 300 : 100))
+    const run = cli(writeCsv('scene-relative-window.csv', toCsv(wideWindow)), ...SCENE)
+    assert.equal(run.code, 0)
+    assert.equal(run.stdout.split('\n')[0], 'ok')
+})
+
+test('rise-ratio: pico de 1,4x do repouso e not-opened no padrao e ok com 1,25', () => {
+    const csv = writeCsv('rise-14.csv', toCsv(hoverAt(4500, 7000, 1400)))
+    const events = JSON.stringify(HOVER)
+    const byDefault = cli(csv, '--expect', 'hover', '--events', events)
+    assert.equal(byDefault.code, 1)
+    assert.equal(byDefault.stdout.split('\n')[0], 'not-opened')
+
+    const tuned = cli(csv, '--expect', 'hover', '--events', events, '--rise-ratio', '1.25')
+    assert.equal(tuned.code, 0)
+    assert.equal(tuned.stdout.split('\n')[0], 'ok')
+})
+
+test('rise-ratio: subida de 1,13x e not-opened mesmo com 1,25', () => {
+    const csv = writeCsv('rise-113.csv', toCsv(hoverAt(4500, 7000, 1130)))
+    const run = cli(csv, '--expect', 'hover', '--events', JSON.stringify(HOVER), '--rise-ratio', '1.25')
+    assert.equal(run.code, 1)
+    assert.equal(run.stdout.split('\n')[0], 'not-opened')
+})
+
+test('rise-ratio e min-rest-width validos: aceitos com qualquer --expect', () => {
+    const csv = writeCsv('flags-valid.csv', toCsv(withWidth(series(12000, () => HUD), () => 300)))
+    const byDefault = cli(csv, '--rise-ratio', '1.25', '--min-rest-width', '300')
+    assert.equal(byDefault.code, 0)
+    assert.equal(byDefault.stdout.split('\n')[0], 'ok')
+    const hover = cli(csv, '--expect', 'hover', '--events', JSON.stringify(HOVER), '--rise-ratio', '1.25', '--min-rest-width', '300')
+    assert.equal(hover.code, 1)
+    assert.equal(hover.stdout.split('\n')[0], 'not-opened')
+})
+
+test('rise-ratio e min-rest-width invalidos: uso, codigo 2', () => {
+    const csv = writeCsv('flags-invalid.csv', toCsv(series(12000, () => HUD)))
+    for (const value of ['1', '0.5', 'abc', '', 'Infinity']) {
+        assert.equal(cli(csv, '--rise-ratio', value).code, 2, `--rise-ratio "${value}"`)
+    }
+    for (const value of ['0', '-5', '1.5', '1e3', 'abc', '']) {
+        assert.equal(cli(csv, '--min-rest-width', value).code, 2, `--min-rest-width "${value}"`)
+    }
+    assert.equal(cli(csv, '--rise-ratio').code, 2)
+    assert.equal(cli(csv, '--min-rest-width').code, 2)
+})
+
+test('repouso do hover vem de antes de entrar: painel que nunca fecha e not-closed, nao not-opened', () => {
+    const csv = writeCsv('hover-never-closes.csv', toCsv(series(12000, (tMs) => (tMs < 3500 ? HUD : OPEN))))
+    const run = cli(csv, '--expect', 'hover', '--events', '{"enterMs":3000,"leaveMs":6000}')
+    assert.equal(run.code, 1)
+    assert.equal(run.stdout.split('\n')[0], 'not-closed')
+})
+
+test('repouso antes da entrada, unidade: detectPulses usa a mediana dos visiveis antes de restBeforeMs', () => {
+    const frames = series(12000, (tMs) => (tMs < 3500 ? HUD : OPEN))
+    assert.equal(detectPulses(frames, { restBeforeMs: 3000 }).restForeground, HUD)
+})
+
+test('idle que abre em 9 s e fica aberto ate o fim: pulsed', () => {
+    const csv = writeCsv('idle-opens-late.csv', toCsv(series(12000, (tMs) => (tMs < 9000 ? HUD : OPEN))))
+    const run = cli(csv)
+    assert.equal(run.code, 1)
+    assert.equal(run.stdout.split('\n')[0], 'pulsed')
+})
+
+test('idle aberto desde o primeiro quadro: ok sem flag, open-at-rest com --max-rest-foreground', () => {
+    const csv = writeCsv('idle-open-all.csv', toCsv(series(12000, () => OPEN)))
+    const plain = cli(csv)
+    assert.equal(plain.code, 0)
+    assert.equal(plain.stdout.split('\n')[0], 'ok')
+    const capped = cli(csv, '--max-rest-foreground', '2100')
+    assert.equal(capped.code, 1)
+    assert.equal(capped.stdout.split('\n')[0], 'open-at-rest')
+})
+
+test('--max-rest-foreground: repouso igual ao maximo passa', () => {
+    const csv = writeCsv('rest-at-max.csv', toCsv(series(12000, () => 2100)))
+    const run = cli(csv, '--max-rest-foreground', '2100')
+    assert.equal(run.code, 0)
+    assert.equal(run.stdout.split('\n')[0], 'ok')
+})
+
+test('--max-rest-foreground: hover e drag com repouso aberto dao open-at-rest', () => {
+    const csv = writeCsv('open-everywhere.csv', toCsv(series(12000, () => OPEN)))
+    const hover = cli(csv, '--expect', 'hover', '--events', '{"enterMs":4000,"leaveMs":7000}', '--max-rest-foreground', '2100')
+    assert.equal(hover.code, 1)
+    assert.equal(hover.stdout.split('\n')[0], 'open-at-rest')
+    const drag = cli(csv, '--expect', 'drag', '--events', '{"pressMs":6000,"releaseMs":8000,"dx":0,"dy":0}', '--max-rest-foreground', '2100')
+    assert.equal(drag.code, 1)
+    assert.equal(drag.stdout.split('\n')[0], 'open-at-rest')
+})
+
+test('limiar de repouso e p5: 3% de quadros baixos nao viram repouso', () => {
+    const csv = writeCsv('low-3pct.csv', toCsv(series(12000, (tMs) => ((tMs / 50) % 33 === 0 ? 400 : HUD))))
+    const run = cli(csv)
+    assert.equal(run.code, 0)
+    assert.equal(run.stdout.split('\n')[0], 'ok')
+})
+
+test('--max-rest-foreground invalido: uso, codigo 2', () => {
+    const csv = writeCsv('max-rest-invalid.csv', toCsv(series(12000, () => HUD)))
+    for (const value of ['0', '-5', '1.5', 'abc', '']) {
+        assert.equal(cli(csv, '--max-rest-foreground', value).code, 2, `--max-rest-foreground "${value}"`)
+    }
+    assert.equal(cli(csv, '--max-rest-foreground').code, 2)
+})
+
+// Quadros de base com os valores de flashes ({ tMs: foreground }) trocados.
+function withFlashes(frames, flashes) {
+    return frames.map((frame) => (flashes[frame.tMs] !== undefined ? { ...frame, foreground: flashes[frame.tMs] } : frame))
+}
+
+const FLASH_MAX = 35000
+const FLASH = ['--max-foreground', String(FLASH_MAX)]
+
+test('flashFrames: um quadro isolado acima do maximo e listado', () => {
+    const frames = withFlashes(series(12000, () => HUD), { 5000: 250000 })
+    assert.deepEqual(flashFrames(frames, FLASH_MAX).map((frame) => [frame.tMs, frame.foreground]), [[5000, 250000]])
+})
+
+test('flashFrames: quadro dentro do settle (antes de +2 s da primeira aparicao) tambem conta', () => {
+    const frames = withFlashes(series(12000, () => HUD), { 1500: 221691 })
+    assert.deepEqual(flashFrames(frames, FLASH_MAX).map((frame) => frame.tMs), [1500])
+})
+
+test('flashFrames: quadro igual ao maximo nao e flash; um acima dele, e', () => {
+    const frames = withFlashes(series(12000, () => FLASH_MAX), { 6000: FLASH_MAX + 1 })
+    assert.deepEqual(flashFrames(frames, FLASH_MAX).map((frame) => frame.tMs), [6000])
+})
+
+test('flashFrames: sem maximo (undefined), lista vazia', () => {
+    const frames = withFlashes(series(12000, () => HUD), { 5000: 346477 })
+    assert.deepEqual(flashFrames(frames, undefined), [])
+})
+
+test('CLI flash: quadros acima do maximo dao codigo 1, veredito flash e uma linha quadro por quadro, em ordem', () => {
+    const csv = writeCsv('flash-two.csv', toCsv(withFlashes(series(12000, () => HUD), { 5000: 221691, 9000: 346477 })))
+    const run = cli(csv, ...FLASH)
+    assert.equal(run.code, 1)
+    assert.deepEqual(run.stdout.split('\n').slice(0, 3), ['flash', 'quadro 5000 221691', 'quadro 9000 346477'])
+})
+
+test('CLI flash: sem --max-foreground o mesmo CSV nao muda o veredito', () => {
+    const csv = writeCsv('flash-off.csv', toCsv(withFlashes(series(12000, () => HUD), { 5000: 250000 })))
+    const run = cli(csv)
+    assert.equal(run.code, 0)
+    assert.equal(run.stdout.split('\n')[0], 'ok')
+})
+
+test('CLI flash: quadro dentro do settle conta; quadro igual ao maximo nao', () => {
+    const early = cli(writeCsv('flash-settle.csv', toCsv(withFlashes(series(12000, () => HUD), { 1500: 250000 }))), ...FLASH)
+    assert.equal(early.code, 1)
+    assert.equal(early.stdout.split('\n')[0], 'flash')
+    const atMax = cli(writeCsv('flash-at-max.csv', toCsv(series(12000, () => FLASH_MAX))), ...FLASH)
+    assert.equal(atMax.code, 0)
+    assert.equal(atMax.stdout.split('\n')[0], 'ok')
+})
+
+test('CLI flash: vale no hover e no arrasto, com codigo 1', () => {
+    const hover = cli(writeCsv('flash-hover.csv', toCsv(withFlashes(hoverPulse(4500, 7000), { 2000: 250000 }))), '--expect', 'hover', '--events', JSON.stringify(HOVER), ...FLASH)
+    assert.equal(hover.code, 1)
+    assert.equal(hover.stdout.split('\n')[0], 'flash')
+    const drag = cli(writeCsv('flash-drag.csv', toCsv(withFlashes(floatingDrag(), { 2000: 250000 }))), '--expect', 'drag', '--events', JSON.stringify(DRAG), ...FLASH)
+    assert.equal(drag.code, 1)
+    assert.equal(drag.stdout.split('\n')[0], 'flash')
+})
+
+test('CLI flash: antes do open-at-rest (repouso aberto e flash: flash)', () => {
+    const csv = writeCsv('flash-open.csv', toCsv(withFlashes(series(12000, () => OPEN), { 5000: 250000 })))
+    const run = cli(csv, '--max-rest-foreground', '2100', ...FLASH)
+    assert.equal(run.code, 1)
+    assert.equal(run.stdout.split('\n')[0], 'flash')
+})
+
+test('CLI flash: wrong-scene (5) e not-visible (4) da guarda de cena vencem o flash', () => {
+    const narrow = cli(writeCsv('flash-scene.csv', toCsv(withFlashes(withWidth(series(12000, () => HUD), () => 100), { 5000: 250000 }))), ...SCENE, ...FLASH)
+    assert.equal(narrow.code, 5)
+    assert.equal(narrow.stdout.split('\n')[0], 'wrong-scene')
+    const noRest = cli(writeCsv('flash-scene-none.csv', toCsv(withFlashes(series(12000, (t) => (t < 1000 ? HUD : 0)), { 9000: 250000 }))), ...SCENE, ...FLASH)
+    assert.equal(noRest.code, 4)
+    assert.equal(noRest.stdout.split('\n')[0], 'not-visible')
+})
+
+test('CLI --max-foreground valido e aceito com qualquer --expect', () => {
+    const csv = writeCsv('flash-valid.csv', toCsv(series(12000, () => HUD)))
+    assert.equal(cli(csv, ...FLASH).code, 0)
+    const hover = writeCsv('flash-valid-hover.csv', toCsv(hoverPulse(4500, 7000)))
+    assert.equal(cli(hover, '--expect', 'hover', '--events', JSON.stringify(HOVER), ...FLASH).code, 0)
+    assert.notEqual(cli(csv, '--expect', 'drag', '--events', JSON.stringify(DRAG), ...FLASH).code, 2)
+})
+
+test('--max-foreground invalido: uso, codigo 2', () => {
+    const csv = writeCsv('flash-invalid.csv', toCsv(series(12000, () => HUD)))
+    for (const value of ['0', '-5', '1.5', 'abc', '']) {
+        assert.equal(cli(csv, '--max-foreground', value).code, 2, `--max-foreground "${value}"`)
+    }
+    assert.equal(cli(csv, '--max-foreground').code, 2)
 })

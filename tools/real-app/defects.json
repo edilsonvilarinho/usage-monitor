@@ -1,0 +1,157 @@
+{
+  "drag-not-kept": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+        "find": "floatCenter = center",
+        "replace": "floatCenter = floatCenter"
+      }
+    ],
+    "expect": {
+      "floating-drag": "not-moved"
+    }
+  },
+  "drag-half-way": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindowDrag.kt",
+        "find": "position.x + (current.x - previous.x).dp",
+        "replace": "position.x + ((current.x - previous.x) / 2).dp"
+      }
+    ],
+    "expect": {
+      "floating-drag": "wrong-place"
+    }
+  },
+  "hover-stays-open": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+        "find": "delay(HUD_COLLAPSE_DELAY_MILLIS)",
+        "replace": "delay(60_000L)"
+      }
+    ],
+    "expect": {
+      "docked-top-hover": "not-closed",
+      "docked-top-hole-hover": "not-closed",
+      "floating-drag": "not-closed"
+    }
+  },
+  "hover-opens-late": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+        "find": "delay(hudOpenDelayMillis(",
+        "replace": "delay(2_000L + hudOpenDelayMillis("
+      }
+    ],
+    "expect": {
+      "docked-top-hover": "opened-late",
+      "docked-top-hole-hover": "opened-late"
+    }
+  },
+  "hole-ignores-hover": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotch.kt",
+        "find": "onHoleHovered = { balloon.holeHovered(holeIndex) }",
+        "replace": "onHoleHovered = { }"
+      }
+    ],
+    "expect": {
+      "docked-top-hole-hover": "not-opened"
+    }
+  },
+  "hole-opens-alone": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+        "find": "LaunchedEffect(hovered, drag.dragging) {",
+        "replace": "LaunchedEffect(Unit) { delay(18_000L); repeat(40) { windowOpen = true; expanded = true; delay(50L) }; expanded = false; delay(1_000L); windowOpen = false }\n    LaunchedEffect(hovered, drag.dragging) {"
+      },
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotchBalloonState.kt",
+        "find": "LaunchedEffect(holeMembers) {",
+        "replace": "LaunchedEffect(Unit) { kotlinx.coroutines.delay(18_000L); repeat(40) { balloonIndex = holeIndex; kotlinx.coroutines.delay(50L) } }\n    LaunchedEffect(holeMembers) {"
+      }
+    ],
+    "expect": {
+      "docked-top-hole-idle": "pulsed",
+      "docked-top-hole-hover": "extra-pulse"
+    }
+  },
+  "opens-and-stays": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+        "find": "LaunchedEffect(hovered, drag.dragging) {",
+        "replace": "LaunchedEffect(Unit) { delay(0L); while (true) { windowOpen = true; expanded = true; delay(50L) } }\n    LaunchedEffect(hovered, drag.dragging) {"
+      },
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotchBalloonState.kt",
+        "find": "LaunchedEffect(holeMembers) {",
+        "replace": "LaunchedEffect(Unit) { kotlinx.coroutines.delay(0L); while (true) { if (holeMembers.isNotEmpty()) balloonIndex = holeIndex; kotlinx.coroutines.delay(50L) } }\n    LaunchedEffect(holeMembers) {"
+      }
+    ],
+    "expect": {
+      "floating-idle": "open-at-rest",
+      "docked-top-idle": "open-at-rest",
+      "docked-bottom-idle": "open-at-rest",
+      "docked-left-idle": "open-at-rest",
+      "docked-right-idle": "open-at-rest",
+      "docked-top-hole-idle": "open-at-rest"
+    }
+  },
+  "opens-late-and-stays": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+        "find": "LaunchedEffect(hovered, drag.dragging) {",
+        "replace": "LaunchedEffect(Unit) { delay(12_000L); while (true) { windowOpen = true; expanded = true; delay(50L) } }\n    LaunchedEffect(hovered, drag.dragging) {"
+      },
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotchBalloonState.kt",
+        "find": "LaunchedEffect(holeMembers) {",
+        "replace": "LaunchedEffect(Unit) { kotlinx.coroutines.delay(12_000L); while (true) { if (holeMembers.isNotEmpty()) balloonIndex = holeIndex; kotlinx.coroutines.delay(50L) } }\n    LaunchedEffect(holeMembers) {"
+      }
+    ],
+    "expect": {
+      "floating-idle": "pulsed",
+      "docked-top-idle": "pulsed",
+      "docked-bottom-idle": "pulsed",
+      "docked-left-idle": "pulsed",
+      "docked-right-idle": "pulsed",
+      "docked-top-hole-idle": "pulsed"
+    }
+  },
+  "prewarm-visible": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/WindowsDwmCloak.kt",
+        "find": "IntByReference(if (cloaked) 1 else 0)",
+        "replace": "IntByReference(0)"
+      },
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/AppDialogWindow.kt",
+        "find": "window.focusableWindowState = false\n        setWindowOpacity(window, 0f)",
+        "replace": "window.focusableWindowState = false\n        setWindowOpacity(window, 1f)"
+      },
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/AppDialogWindow.kt",
+        "find": "awaitAwtEventTurn()\n                    host.onScreen = false",
+        "replace": "delay(150L)\n                    awaitAwtEventTurn()\n                    host.onScreen = false"
+      }
+    ],
+    "expect": {
+      "floating-idle": "flash",
+      "docked-top-idle": "flash",
+      "docked-bottom-idle": "flash",
+      "docked-left-idle": "flash",
+      "docked-right-idle": "flash",
+      "docked-top-hover": "flash",
+      "floating-drag": "flash",
+      "docked-top-hole-idle": "flash",
+      "docked-top-hole-hover": "flash"
+    }
+  }
+}
