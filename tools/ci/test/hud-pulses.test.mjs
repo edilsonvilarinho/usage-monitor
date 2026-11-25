@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { detectPulses, dragVerdict, hoverVerdict, parseFrames, verdictOf } from '../hud-pulses.mjs'
+import { detectPulses, dragVerdict, flashFrames, hoverVerdict, parseFrames, verdictOf } from '../hud-pulses.mjs'
 
 const SCRIPT = fileURLToPath(new URL('../hud-pulses.mjs', import.meta.url))
 const HEADER = 't_ms,foreground,x,y,w,h'
@@ -475,4 +475,96 @@ test('--max-rest-foreground invalido: uso, codigo 2', () => {
         assert.equal(cli(csv, '--max-rest-foreground', value).code, 2, `--max-rest-foreground "${value}"`)
     }
     assert.equal(cli(csv, '--max-rest-foreground').code, 2)
+})
+
+// Quadros de base com os valores de flashes ({ tMs: foreground }) trocados.
+function withFlashes(frames, flashes) {
+    return frames.map((frame) => (flashes[frame.tMs] !== undefined ? { ...frame, foreground: flashes[frame.tMs] } : frame))
+}
+
+const FLASH_MAX = 35000
+const FLASH = ['--max-foreground', String(FLASH_MAX)]
+
+test('flashFrames: um quadro isolado acima do maximo e listado', () => {
+    const frames = withFlashes(series(12000, () => HUD), { 5000: 250000 })
+    assert.deepEqual(flashFrames(frames, FLASH_MAX).map((frame) => [frame.tMs, frame.foreground]), [[5000, 250000]])
+})
+
+test('flashFrames: quadro dentro do settle (antes de +2 s da primeira aparicao) tambem conta', () => {
+    const frames = withFlashes(series(12000, () => HUD), { 1500: 221691 })
+    assert.deepEqual(flashFrames(frames, FLASH_MAX).map((frame) => frame.tMs), [1500])
+})
+
+test('flashFrames: quadro igual ao maximo nao e flash; um acima dele, e', () => {
+    const frames = withFlashes(series(12000, () => FLASH_MAX), { 6000: FLASH_MAX + 1 })
+    assert.deepEqual(flashFrames(frames, FLASH_MAX).map((frame) => frame.tMs), [6000])
+})
+
+test('flashFrames: sem maximo (undefined), lista vazia', () => {
+    const frames = withFlashes(series(12000, () => HUD), { 5000: 346477 })
+    assert.deepEqual(flashFrames(frames, undefined), [])
+})
+
+test('CLI flash: quadros acima do maximo dao codigo 1, veredito flash e uma linha quadro por quadro, em ordem', () => {
+    const csv = writeCsv('flash-two.csv', toCsv(withFlashes(series(12000, () => HUD), { 5000: 221691, 9000: 346477 })))
+    const run = cli(csv, ...FLASH)
+    assert.equal(run.code, 1)
+    assert.deepEqual(run.stdout.split('\n').slice(0, 3), ['flash', 'quadro 5000 221691', 'quadro 9000 346477'])
+})
+
+test('CLI flash: sem --max-foreground o mesmo CSV nao muda o veredito', () => {
+    const csv = writeCsv('flash-off.csv', toCsv(withFlashes(series(12000, () => HUD), { 5000: 250000 })))
+    const run = cli(csv)
+    assert.equal(run.code, 0)
+    assert.equal(run.stdout.split('\n')[0], 'ok')
+})
+
+test('CLI flash: quadro dentro do settle conta; quadro igual ao maximo nao', () => {
+    const early = cli(writeCsv('flash-settle.csv', toCsv(withFlashes(series(12000, () => HUD), { 1500: 250000 }))), ...FLASH)
+    assert.equal(early.code, 1)
+    assert.equal(early.stdout.split('\n')[0], 'flash')
+    const atMax = cli(writeCsv('flash-at-max.csv', toCsv(series(12000, () => FLASH_MAX))), ...FLASH)
+    assert.equal(atMax.code, 0)
+    assert.equal(atMax.stdout.split('\n')[0], 'ok')
+})
+
+test('CLI flash: vale no hover e no arrasto, com codigo 1', () => {
+    const hover = cli(writeCsv('flash-hover.csv', toCsv(withFlashes(hoverPulse(4500, 7000), { 2000: 250000 }))), '--expect', 'hover', '--events', JSON.stringify(HOVER), ...FLASH)
+    assert.equal(hover.code, 1)
+    assert.equal(hover.stdout.split('\n')[0], 'flash')
+    const drag = cli(writeCsv('flash-drag.csv', toCsv(withFlashes(floatingDrag(), { 2000: 250000 }))), '--expect', 'drag', '--events', JSON.stringify(DRAG), ...FLASH)
+    assert.equal(drag.code, 1)
+    assert.equal(drag.stdout.split('\n')[0], 'flash')
+})
+
+test('CLI flash: antes do open-at-rest (repouso aberto e flash: flash)', () => {
+    const csv = writeCsv('flash-open.csv', toCsv(withFlashes(series(12000, () => OPEN), { 5000: 250000 })))
+    const run = cli(csv, '--max-rest-foreground', '2100', ...FLASH)
+    assert.equal(run.code, 1)
+    assert.equal(run.stdout.split('\n')[0], 'flash')
+})
+
+test('CLI flash: wrong-scene (5) e not-visible (4) da guarda de cena vencem o flash', () => {
+    const narrow = cli(writeCsv('flash-scene.csv', toCsv(withFlashes(withWidth(series(12000, () => HUD), () => 100), { 5000: 250000 }))), ...SCENE, ...FLASH)
+    assert.equal(narrow.code, 5)
+    assert.equal(narrow.stdout.split('\n')[0], 'wrong-scene')
+    const noRest = cli(writeCsv('flash-scene-none.csv', toCsv(withFlashes(series(12000, (t) => (t < 1000 ? HUD : 0)), { 9000: 250000 }))), ...SCENE, ...FLASH)
+    assert.equal(noRest.code, 4)
+    assert.equal(noRest.stdout.split('\n')[0], 'not-visible')
+})
+
+test('CLI --max-foreground valido e aceito com qualquer --expect', () => {
+    const csv = writeCsv('flash-valid.csv', toCsv(series(12000, () => HUD)))
+    assert.equal(cli(csv, ...FLASH).code, 0)
+    const hover = writeCsv('flash-valid-hover.csv', toCsv(hoverPulse(4500, 7000)))
+    assert.equal(cli(hover, '--expect', 'hover', '--events', JSON.stringify(HOVER), ...FLASH).code, 0)
+    assert.notEqual(cli(csv, '--expect', 'drag', '--events', JSON.stringify(DRAG), ...FLASH).code, 2)
+})
+
+test('--max-foreground invalido: uso, codigo 2', () => {
+    const csv = writeCsv('flash-invalid.csv', toCsv(series(12000, () => HUD)))
+    for (const value of ['0', '-5', '1.5', 'abc', '']) {
+        assert.equal(cli(csv, '--max-foreground', value).code, 2, `--max-foreground "${value}"`)
+    }
+    assert.equal(cli(csv, '--max-foreground').code, 2)
 })

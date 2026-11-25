@@ -267,11 +267,12 @@ jobs:
                       $detectorArgs += @('--expect', 'drag', '--events', $eventsArg)
                   }
                   # Rest above the max = panel open at rest (open-at-rest): 2100 px for the rest of docked/floating (measured 1069-1426), 35500 for the hole strip (measured 28313-29107).
+                  # Flash = one frame above the max, anywhere in the recording. Largest legitimate frame: 45.479 (hole, 380 recordings) and 16.989 (others); measured flashes 221.691 to 346.477.
                   if ($scenario -like 'docked-top-hole-*') {
                       # Hole strips: rise ratio 1.25 is more sensitive than the default 1.5 (flags smaller hovers); the minimum rest width rejects wrong scenes.
-                      $detectorArgs += @('--rise-ratio', '1.25', '--min-rest-width', '300', '--max-rest-foreground', '35500')
+                      $detectorArgs += @('--rise-ratio', '1.25', '--min-rest-width', '300', '--max-rest-foreground', '35500', '--max-foreground', '91000')
                   } else {
-                      $detectorArgs += @('--max-rest-foreground', '2100')
+                      $detectorArgs += @('--max-rest-foreground', '2100', '--max-foreground', '35000')
                   }
                   node tools/ci/hud-pulses.mjs @detectorArgs *> $verdictPath
                   $code = $LASTEXITCODE

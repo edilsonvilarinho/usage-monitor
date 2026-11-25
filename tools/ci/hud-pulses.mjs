@@ -2,10 +2,10 @@
 // Detector de pulsos da HUD (A02 do plano #652). Entrada: CSV de quadros da
 // captura (tools/real-app/record.ps1), um quadro a cada ~50 ms.
 //
-// Uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events '{"enterMs":n,"leaveMs":n}' | --expect drag --events '{"pressMs":n,"releaseMs":n,"dx":n,"dy":n}'] [--rise-ratio <n>] [--min-rest-width <n>] [--max-rest-foreground <n>]
+// Uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events '{"enterMs":n,"leaveMs":n}' | --expect drag --events '{"pressMs":n,"releaseMs":n,"dx":n,"dy":n}'] [--rise-ratio <n>] [--min-rest-width <n>] [--max-rest-foreground <n>] [--max-foreground <n>]
 // Saida: veredito na primeira linha, depois um pulso por linha. Padrao: ok, pulsed, not-visible (0, 1, 4).
 // Limiar: hover mede o repouso antes de entrar (mediana); os outros modos usam o p5 dos visiveis.
-// Hover: ok (0), not-opened, opened-late, not-closed, extra-pulse (1), not-visible (4). Drag: ok (0), not-moved, wrong-place, not-closed (1), not-visible (4). Open-at-rest (1) com --max-rest-foreground (inteiro > 0): repouso acima do maximo, antes do veredito de pulso. Uso ou CSV invalido: 2.
+// Hover: ok (0), not-opened, opened-late, not-closed, extra-pulse (1), not-visible (4). Drag: ok (0), not-moved, wrong-place, not-closed (1), not-visible (4). Open-at-rest (1) com --max-rest-foreground (inteiro > 0): repouso acima do maximo, antes do veredito de pulso. Flash (1) com --max-foreground (inteiro > 0): um quadro acima do maximo, em qualquer ponto, antes de open-at-rest; uma linha `quadro <tMs> <foreground>` por quadro. Uso ou CSV invalido: 2.
 // --rise-ratio (> 1, padrao 1.5) troca o limiar de subida. --min-rest-width (inteiro > 0) confere a escala da cena antes de qualquer
 // outro veredito: mediana de w no repouso abaixo do minimo e wrong-scene (5); sem quadro nessa janela, not-visible.
 import { readFileSync } from 'node:fs'
@@ -13,7 +13,7 @@ import { pathToFileURL } from 'node:url'
 
 const HEADER = 't_ms,foreground,x,y,w,h'
 const DEFAULTS = { settleMs: 2000, riseRatio: 1.5, minFrames: 2, minForeground: 400, tailMs: 1000 }
-const EXIT = { ok: 0, pulsed: 1, 'open-at-rest': 1, usage: 2, 'not-visible': 4, 'wrong-scene': 5 }
+const EXIT = { ok: 0, pulsed: 1, 'open-at-rest': 1, flash: 1, usage: 2, 'not-visible': 4, 'wrong-scene': 5 }
 
 export function parseFrames(csv) {
     const frames = []
@@ -78,6 +78,13 @@ export function detectPulses(frames, options = {}) {
 export function verdictOf(result) {
     if (!result.appeared || result.restForeground === null) return 'not-visible'
     return result.pulses.length > 0 ? 'pulsed' : 'ok'
+}
+
+// Flash (--max-foreground): quadro acima do maximo, em qualquer ponto da gravacao (inclusive antes do settle).
+// Igual ao maximo nao conta; sem maximo, nenhum quadro.
+export function flashFrames(frames, maxForeground) {
+    if (maxForeground === undefined) return []
+    return frames.filter((frame) => frame.foreground > maxForeground)
 }
 
 // Um pulso so: abre ate openWithinMs depois de entrar e fecha (ultimo quadro acima do limiar
@@ -153,7 +160,7 @@ function median(values) {
 }
 
 const USAGE = 'uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events \'{"enterMs":n,"leaveMs":n}\']'
-const VALUE_FLAGS = ['--expect', '--events', '--rise-ratio', '--min-rest-width', '--max-rest-foreground']
+const VALUE_FLAGS = ['--expect', '--events', '--rise-ratio', '--min-rest-width', '--max-rest-foreground', '--max-foreground']
 const REST_FROM_MS = 2000
 const REST_UNTIL_MS = 7000
 
@@ -175,6 +182,7 @@ function parseArgs(argv) {
         riseRatio: parseRiseRatio(flags['--rise-ratio']),
         minRestWidth: parsePositiveInteger('--min-rest-width', flags['--min-rest-width']),
         maxRestForeground: parsePositiveInteger('--max-rest-foreground', flags['--max-rest-foreground']),
+        maxForeground: parsePositiveInteger('--max-foreground', flags['--max-foreground']),
     }
     if (flags['--expect'] === undefined) {
         if (flags['--events'] !== undefined) throw new Error(USAGE)
@@ -255,6 +263,13 @@ function printOpenAtRest() {
     return EXIT['open-at-rest']
 }
 
+// Flash: veredito antes de open-at-rest; uma linha por quadro acima do maximo, na ordem da gravacao.
+function printFlash(flashes) {
+    console.log('flash')
+    flashes.forEach((frame) => console.log(`quadro ${frame.tMs} ${frame.foreground}`))
+    return EXIT.flash
+}
+
 // Arrasto: mediana dos visiveis antes do aperto (mesma janela de dragVerdict: 3 s antes de apertar).
 function dragRestForeground(frames, pressMs) {
     const before = frames.filter((frame) => frame.tMs <= pressMs - 3000 && frame.foreground >= DEFAULTS.minForeground)
@@ -262,13 +277,15 @@ function dragRestForeground(frames, pressMs) {
 }
 
 function main(argv) {
-    const { csv, expect, events, riseRatio, minRestWidth, maxRestForeground } = parseArgs(argv)
+    const { csv, expect, events, riseRatio, minRestWidth, maxRestForeground, maxForeground } = parseArgs(argv)
     const frames = parseFrames(readFileSync(csv, 'utf8'))
     const scene = sceneVerdict(frames, minRestWidth)
     if (scene !== null) {
         console.log(scene)
         return EXIT[scene]
     }
+    const flashes = flashFrames(frames, maxForeground)
+    if (flashes.length > 0) return printFlash(flashes)
     if (expect === 'drag') {
         const verdict = dragVerdict(frames, events)
         if (verdict !== 'not-visible' && isOpenAtRest(dragRestForeground(frames, events.pressMs), maxRestForeground)) return printOpenAtRest()
