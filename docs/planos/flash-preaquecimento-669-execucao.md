@@ -10,7 +10,7 @@ Nenhuma janela aparece no arranque sem o usuário pedir, sem perder o ganho do p
 
 ## Fatos confirmados (2026-11-25)
 
-- 4 de 559 gravações com um quadro opaco. Nos artefatos dos runs 45494153000 e 45497278470 (380 gravações, ~10 quadros/s), lidos por script:
+- 5 de 559 gravações com um quadro opaco (a conta da #657 era 4; a regra de 1 quadro achou mais uma). Nos artefatos dos runs 45494153000 e 45497278470 (380 gravações, ~10 quadros/s), lidos por script:
 
 | Gravação | Quadro | Pixels | Após a HUD | Janela (imagem aberta) |
 |---|---|---|---|---|
@@ -20,7 +20,7 @@ Nenhuma janela aparece no arranque sem o usuário pedir, sem perder o ganho do p
 | `source` 9, `floating-idle` | 6.247 ms | 345.065 | 2.904 ms | Ajuda |
 
 - A janela aparece **já pintada**, com o conteúdo inteiro. Bate com `SETTINGS_PREWARM_DELAY_MILLIS` (0,8 s) e `OTHER_MODALS_PREWARM_DELAY_MILLIS`
-  (2,5 s) mais o custo de criar. A quarta, da `v42.3.0-beta.15` publicada, não foi aberta.
+  (2,5 s) mais o custo de criar. A quinta, da `v42.3.0-beta.15` publicada, não foi aberta.
 - O app grava `render=DIRECT3D` no `app.log` das gravações; `SOFTWARE` é só do build Linux (`build.gradle.kts:149`).
 - O Compose 1.12.2 chama `Window.setVisible` em corrotina própria (`AwtWindow…showJob`, lido no bytecode), depois da recomposição.
 
@@ -45,3 +45,4 @@ com N' tal que a chance de 0 sob a taxa medida seja menor que 1% (`(1 - K/N)^N' 
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | sem harness (plano); `frames.csv` de 380 gravações lidos por script, 3 imagens abertas | fatos acima |
+| A02 (sonda) | `gradlew.bat desktopTest --tests "*PrewarmFlashSamplesTest*" --tests "*ArchitectureRulesTest*"` | vermelho (stub): 8 de 9, `expected:<[ClassifiedPrewarmFlash(cycle=null…)]> but was:<[]>`; devolvida 1× (flash na borda do ciclo saía sem ciclo), vermelho `:81 :94 :121 expected cycle=0/1, was cycle=null`; verde 13/13, `ArchitectureRulesTest` 41/41. A janela da sonda não tem harness: é a medição da A02 |
