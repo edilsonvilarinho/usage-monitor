@@ -347,8 +347,12 @@ private fun WindowScope.ModalWindowBody(
                         setWindowOpacity(window, 1f)
                         reveal.settle()
                     }
-                    host.cloak?.release()
-                    host.onScreen = true
+                    if (!showUncloaked(host.cloak) { host.onScreen = true }) {
+                        currentEnvironment.breadcrumbs.record(
+                            BreadcrumbCategory.NAVIGATION,
+                            modalUncloakRefusedBreadcrumb(currentDiagnosticName)
+                        )
+                    }
                     // Dois quadros: o primeiro recompõe o que mudou com a janela
                     // escondida, o segundo garante pixel pintado. O teto existe para
                     // janela minimizada, que não recebe quadro e ficaria transparente
@@ -458,7 +462,7 @@ private suspend fun prewarmWindow(
             if (shouldCloakModalWindow(AutoStartManager.currentPlatform())) WindowsDwmCloak(window) else WindowCloak { false }
         )
         host.cloak = cloak
-        val shown = try {
+        val outcome = try {
             prewarmCloaked(
                 cloak = cloak,
                 show = { host.onScreen = true },
@@ -477,10 +481,9 @@ private suspend fun prewarmWindow(
         } finally {
             withContext(NonCancellable) { window.focusableWindowState = wasFocusable }
         }
-        if (!shown) return
         breadcrumbs.record(
             BreadcrumbCategory.NAVIGATION,
-            modalPrewarmedBreadcrumb(diagnosticName, (System.nanoTime() - startedAt) / 1_000_000)
+            modalPrewarmOutcomeBreadcrumb(diagnosticName, outcome, (System.nanoTime() - startedAt) / 1_000_000)
         )
     }
 }
@@ -489,8 +492,8 @@ private suspend fun prewarmWindow(
  * Espera a AWT tirar a janela da tela: o DWM só libera o cloak depois disso. Sonda a cada 5 ms
  * com teto de 1 s, sem esperar quadro, que pode nunca chegar.
  */
-private suspend fun awaitWindowHidden(window: java.awt.Window) {
-    awaitUntil(timeoutMillis = 1_000L, stepMillis = 5L) { !window.isVisible }
+private suspend fun awaitWindowHidden(window: java.awt.Window): Boolean {
+    return awaitUntil(timeoutMillis = 1_000L, stepMillis = 5L) { !window.isVisible }
 }
 
 private suspend fun fadeWindow(
