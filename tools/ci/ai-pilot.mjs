@@ -142,10 +142,10 @@ function textOf(value) {
 const isRule = (value) => Number.isInteger(value) && value >= 1 && value <= RULE_COUNT
 const isShot = (value) => Number.isInteger(value) && value >= 1
 
-// Retângulo inteiro dentro da tela, com lados de 16 px até metade da tela.
+// Retângulo inteiro dentro da tela, com lados de 16 px até o tamanho da tela (a barra flutuante ocupa 430 px).
 function zoomArea({ x, y, w, h }, screen) {
     if (![x, y, w, h].every(Number.isInteger)) return false
-    if (w < 16 || h < 16 || w > screen.width / 2 || h > screen.height / 2) return false
+    if (w < 16 || h < 16 || w > screen.width || h > screen.height) return false
     return x >= 0 && y >= 0 && x + w <= screen.width && y + h <= screen.height
 }
 
@@ -156,7 +156,10 @@ export function validateAction(name, args, screen) {
         case 'screenshot':
             return ok({ tool: 'screenshot' })
         case 'zoom':
-            if (!zoomArea(input, screen)) return bad('campo inválido em zoom: x, y, w e h inteiros; retângulo dentro da tela; 16 <= w,h <= metade da tela')
+            if (!zoomArea(input, screen)) {
+                const received = `recebido x=${input.x} y=${input.y} w=${input.w} h=${input.h}`
+                return bad(`campo inválido em zoom: x, y, w e h inteiros; retângulo dentro da tela; ${received}; permitido 16 <= w <= ${screen.width} e 16 <= h <= ${screen.height}`)
+            }
             return ok({ tool: 'zoom', x: input.x, y: input.y, w: input.w, h: input.h })
         case 'click':
         case 'move':
@@ -306,9 +309,9 @@ const TURN_TEXT = 'ignorado: limite por turno'
 const ZOOM_REPEAT_TEXT = 'erro: zoom repetido sem ação do ponteiro; mova, clique ou arraste antes de recortar de novo'
 const WAIT_TOTAL_TEXT = `erro: espera passa do teto de ${LIMITS.maxTotalWaitMs} ms no roteiro`
 
-// Sequência de chamadas iguais (nome + argumentos JSON), atravessando turnos. Recusa conta para o teto e não zera a sequência.
-function repeatRefusal(state, tool, args) {
-    const key = JSON.stringify([tool, args])
+// Sequência de chamadas iguais (nome + string bruta de argumentos), antes da validação: chamada inválida também conta. Recusa conta para o teto e não zera a sequência.
+function repeatRefusal(state, name, rawArguments) {
+    const key = JSON.stringify([name, rawArguments])
     state.streak = key === state.streakKey ? state.streak + 1 : 1
     state.streakKey = key
     if (state.streak <= LIMITS.maxRepeatStreak) return null
@@ -407,8 +410,16 @@ async function runTurn({ toolCalls, messages, state, driver, screen }) {
             messages.push(toolMessage(toolCall.id, TURN_TEXT))
             continue
         }
+        const name = toolCall?.function?.name
+        // Guarda de repetição roda antes da validação: zoom inválido repetido também entra no laço. done fica de fora (tem recusa própria).
+        const repeat = name === 'done' ? null : repeatRefusal(state, name, toolCall?.function?.arguments)
+        if (repeat) {
+            messages.push(toolMessage(toolCall.id, repeat.text))
+            if (repeat.stuck) return { done: true, stop: 'stuck', images }
+            continue
+        }
         const parsed = parseArguments(toolCall)
-        const checked = parsed.ok ? validateAction(toolCall?.function?.name, parsed.args, screen) : bad(parsed.error)
+        const checked = parsed.ok ? validateAction(name, parsed.args, screen) : bad(parsed.error)
         if (!checked.ok) {
             messages.push(toolMessage(toolCall.id, `erro: ${checked.error}`))
             continue
@@ -419,12 +430,6 @@ async function runTurn({ toolCalls, messages, state, driver, screen }) {
             if (turn.done) return { done: true, stop: turn.stop, images }
             for (const rest of toolCalls.slice(index + 1)) messages.push(toolMessage(rest.id, 'ignorado: done recusado'))
             return { done: false, images }
-        }
-        const repeat = repeatRefusal(state, checked.action.tool, parsed.args)
-        if (repeat) {
-            messages.push(toolMessage(toolCall.id, repeat.text))
-            if (repeat.stuck) return { done: true, stop: 'stuck', images }
-            continue
         }
         const result = await executeTool(checked.action, state, driver)
         messages.push(toolMessage(toolCall.id, result.text))

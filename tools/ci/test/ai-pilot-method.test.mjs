@@ -79,12 +79,19 @@ test('runScript devolve checks, coverage e missing; missing cita o item de cober
     assert.match(JSON.stringify(result.missing), /gear/);
 });
 
-test('zoom: retângulo inteiro dentro da tela, w e h entre 16 e metade da tela', () => {
-    assert.equal(validateAction('zoom', { x: 0, y: 0, w: 500, h: 400 }, SCREEN).ok, true);
-    assert.equal(validateAction('zoom', { x: 900, y: 0, w: 200, h: 100 }, SCREEN).ok, false);
-    assert.equal(validateAction('zoom', { x: 0, y: 0, w: 10, h: 100 }, SCREEN).ok, false);
-    assert.equal(validateAction('zoom', { x: 0, y: 0, w: 600, h: 100 }, SCREEN).ok, false);
-    assert.equal(validateAction('zoom', { x: 0, y: 0, w: 100, h: 500 }, SCREEN).ok, false);
+test('zoom: limites exatos em 1024x768: 16 <= w <= 1024, 16 <= h <= 768, retângulo dentro da tela', () => {
+    const screen = { width: 1024, height: 768 };
+    const accepted = [{ x: 0, y: 0, w: 16, h: 16 }, { x: 0, y: 0, w: 1024, h: 768 }, { x: 1008, y: 752, w: 16, h: 16 }, { x: 0, y: 0, w: 600, h: 100 }, { x: 0, y: 0, w: 100, h: 500 }];
+    const refused = [{ x: 0, y: 0, w: 15, h: 16 }, { x: 0, y: 0, w: 16, h: 15 }, { x: 0, y: 0, w: 1025, h: 16 }, { x: 0, y: 0, w: 16, h: 769 }, { x: 1, y: 0, w: 1024, h: 16 }];
+    for (const rect of accepted) assert.equal(validateAction('zoom', rect, screen).ok, true, JSON.stringify(rect));
+    for (const rect of refused) assert.equal(validateAction('zoom', rect, screen).ok, false, JSON.stringify(rect));
+});
+
+test('zoom recusado diz o recebido e o permitido', () => {
+    assert.equal(
+        validateAction('zoom', { x: 0, y: 0, w: 1025, h: 430 }, { width: 1024, height: 768 }).error,
+        'campo inválido em zoom: x, y, w e h inteiros; retângulo dentro da tela; recebido x=0 y=0 w=1025 h=430; permitido 16 <= w <= 1024 e 16 <= h <= 768',
+    );
 });
 
 test('check: rule 1..9, verdict do enum, shot obrigatória exceto not_seen com seen', () => {

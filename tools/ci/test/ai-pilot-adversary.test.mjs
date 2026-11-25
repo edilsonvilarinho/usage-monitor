@@ -101,9 +101,10 @@ test('adversário: report sem captura não vira achado', async () => {
     assertFailsClosed(result);
 });
 
-test('adversário: JSON quebrado para sempre -> max-steps sem custo acima do teto', async () => {
+test('adversário: JSON quebrado para sempre -> stuck pela guarda de repetição, sem custo acima do teto', async () => {
+    // A guarda roda antes da validação (#676): a mesma string bruta repetida conta mesmo inválida.
     const { result } = await run(fakeClient([reply([rawCall('x', 'move', '{x:')])]));
-    assert.equal(result.stop, 'max-steps');
+    assert.equal(result.stop, 'stuck');
     assertFailsClosed(result);
 });
 
