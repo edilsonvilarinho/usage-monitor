@@ -20,6 +20,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
@@ -35,6 +36,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
@@ -1154,6 +1156,76 @@ class ComponentTest {
         onNodeWithContentDescription("Atualizar").assertIsDisplayed()
         onNodeWithContentDescription("Abrir histórico").assertIsDisplayed()
         onNodeWithContentDescription("Expandir card").assertIsDisplayed()
+    }
+
+    /** Com a leitura em curso o botão vira "Atualizando" e fica desabilitado: o toque não chama o `onRefresh`. */
+    @Test
+    fun `ApiUsageCard refresh button ignores taps while a read is running`() = runDesktopComposeUiTest {
+        var refreshes = 0
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Claude 5h",
+                            used = 45L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.TOKENS,
+                            rawUsed = 1800L,
+                            rawTotal = 4000L
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = true,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = { refreshes += 1 }
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Atualizando").performTouchInput { click() }
+
+        assertEquals(0, refreshes)
+    }
+
+    /** Controle do toque: com a leitura parada o mesmo botão chama o `onRefresh` uma vez. */
+    @Test
+    fun `ApiUsageCard refresh button calls onRefresh once when idle`() = runDesktopComposeUiTest {
+        var refreshes = 0
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                ApiUsageCard(
+                    source = ApiSource.ANTHROPIC,
+                    apiName = "Anthropic",
+                    quotas = listOf(
+                        QuotaInfo(
+                            label = "Claude 5h",
+                            used = 45L,
+                            total = 100L,
+                            periodEndAt = Instant.parse("2026-05-03T12:00:00Z"),
+                            periodType = PeriodType.INTERVAL,
+                            unit = UsageUnit.TOKENS,
+                            rawUsed = 1800L,
+                            rawTotal = 4000L
+                        )
+                    ),
+                    showUsageDetails = false,
+                    isRefreshing = false,
+                    language = AppLanguage.PT,
+                    animationDelayMillis = 0,
+                    onRefresh = { refreshes += 1 }
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Atualizar").performTouchInput { click() }
+
+        assertEquals(1, refreshes)
     }
 
     @Test
