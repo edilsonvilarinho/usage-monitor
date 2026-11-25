@@ -28,11 +28,15 @@ internal val dwmApi: DwmApi by lazy { Native.load("dwmapi", DwmApi::class.java) 
  * Cloak DWM de uma janela AWT. Sem `HWND` ou sem a biblioteca, devolve `false`:
  * o chamador então não mostra a janela escondida.
  */
-internal class WindowsDwmCloak(private val window: java.awt.Window) : WindowCloak {
+internal class WindowsDwmCloak(
+    private val window: java.awt.Window,
+    // Provedor, não instância: a `dwmapi` só carrega na primeira chamada, fora da construção (EDT).
+    private val api: () -> DwmApi = { dwmApi },
+) : WindowCloak {
     override fun set(cloaked: Boolean): Boolean = try {
         if (!window.isDisplayable) window.addNotify()
         val value = IntByReference(if (cloaked) 1 else 0)
-        dwmApi.DwmSetWindowAttribute(Native.getWindowPointer(window), DWMWA_CLOAK, value, 4) == 0
+        api().DwmSetWindowAttribute(Native.getWindowPointer(window), DWMWA_CLOAK, value, 4) == 0
     } catch (error: LinkageError) {
         false
     } catch (error: RuntimeException) {
