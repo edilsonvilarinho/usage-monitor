@@ -568,3 +568,11 @@ test('--max-foreground invalido: uso, codigo 2', () => {
     }
     assert.equal(cli(csv, '--max-foreground').code, 2)
 })
+
+test('CLI --scene: nome valido passa; desconhecido (inclusive prototipo) ou sem valor: uso, codigo 2', () => {
+    const csv = writeCsv('scene-flag.csv', toCsv(series(12000, () => HUD)))
+    assert.notEqual(cli(csv, '--scene', 'floating-idle').code, 2)
+    assert.equal(cli(csv, '--scene', 'nao-existe').code, 2)
+    assert.equal(cli(csv, '--scene', 'constructor').code, 2)
+    assert.equal(cli(csv, '--scene').code, 2)
+})

@@ -1,0 +1,11 @@
+{
+  "floating-idle": { "rest": { "x": 481, "y": 139, "w": 62, "h": 42, "foreground": 1418 }, "startupMax": 1427 },
+  "floating-drag": { "rest": { "x": 481, "y": 139, "w": 62, "h": 42, "foreground": 1418 }, "startupMax": 1427 },
+  "docked-top-idle": { "rest": { "x": 394, "y": 0, "w": 239, "h": 12, "foreground": 1376 }, "startupMax": 1377 },
+  "docked-top-hover": { "rest": { "x": 394, "y": 0, "w": 239, "h": 12, "foreground": 1376 }, "startupMax": 1377 },
+  "docked-bottom-idle": { "rest": { "x": 394, "y": 708, "w": 239, "h": 12, "foreground": 1376 }, "startupMax": 1378 },
+  "docked-left-idle": { "rest": { "x": 0, "y": 266, "w": 12, "h": 188, "foreground": 1069 }, "startupMax": 1071 },
+  "docked-right-idle": { "rest": { "x": 1012, "y": 266, "w": 12, "h": 188, "foreground": 1069 }, "startupMax": 1071 },
+  "docked-top-hole-idle": { "rest": { "x": 335, "y": 0, "w": 357, "h": 106, "foreground": 28368 }, "startupMax": 30706 },
+  "docked-top-hole-hover": { "rest": { "x": 335, "y": 0, "w": 357, "h": 106, "foreground": 28368 }, "startupMax": 30706 }
+}
