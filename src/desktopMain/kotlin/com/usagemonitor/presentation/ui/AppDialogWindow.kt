@@ -114,7 +114,7 @@ internal data class ModalWindowEnvironment(
  * das classes do conteúdo e o primeiro layout — a trilha do 41.6.0-beta.2 media
  * 230 a 515 ms só do pedido ao quadro, fora a criação da janela, contra 42 a 89 ms
  * das reaberturas. Com [ModalWindowEnvironment.prewarmReady], a janela nasce,
- * aparece **transparente e sem foco** por dois quadros e se esconde: a primeira
+ * fica **escondida pelo DWM (cloak) e sem foco** por dois quadros e se esconde: a primeira
  * abertura de verdade vira reabertura. Um pré-aquecimento por vez, e só onde a
  * janela esmaece ([shouldPrewarmModalWindow]). Opt-in porque cada janela viva
  * guarda contexto de GPU: só as abertas com frequência pedem.
@@ -243,6 +243,9 @@ private class ModalWindowHost(initial: ModalRequest) {
 
     /** Aberturas concluídas. Observável: a composição do app lê para agendar a liberação. */
     var opens by mutableStateOf(0)
+
+    /** Cloak DWM do pré-aquecimento; a abertura o libera antes de mostrar a janela. Nulo fora do pré-aquecimento. */
+    var cloak: ModalCloak? = null
 }
 
 /**
@@ -344,6 +347,7 @@ private fun WindowScope.ModalWindowBody(
                         setWindowOpacity(window, 1f)
                         reveal.settle()
                     }
+                    host.cloak?.release()
                     host.onScreen = true
                     // Dois quadros: o primeiro recompõe o que mudou com a janela
                     // escondida, o segundo garante pixel pintado. O teto existe para
@@ -429,9 +433,9 @@ private fun prewarmNow(requested: Boolean, environment: ModalWindowEnvironment):
 private val modalPrewarmLock = Mutex()
 
 /**
- * Mostra a janela transparente e sem foco por dois quadros e a esconde. É o que
- * paga, fora do clique, o peer nativo, o contexto do Skia, a carga das classes e
- * o primeiro layout. `contentOnScreen` fica `false`: conteúdo com laço próprio não
+ * Mostra a janela escondida pelo DWM (cloak, não opacidade) por dois quadros e a esconde; só libera o
+ * cloak depois de a AWT tirá-la da tela. É o que paga, fora do clique, o peer nativo, o contexto do Skia,
+ * a carga das classes e o primeiro layout. `contentOnScreen` fica `false`: conteúdo com laço próprio não
  * o liga. Não conta como abertura.
  */
 private suspend fun prewarmWindow(
@@ -450,24 +454,43 @@ private suspend fun prewarmWindow(
         val wasFocusable = window.focusableWindowState
         window.focusableWindowState = false
         setWindowOpacity(window, 0f)
-        host.onScreen = true
-        try {
-            withTimeoutOrNull(FIRST_FRAME_TIMEOUT_MILLIS) {
-                withFrameNanos { }
-                withFrameNanos { }
-            }
+        val cloak = ModalCloak(
+            if (shouldCloakModalWindow(AutoStartManager.currentPlatform())) WindowsDwmCloak(window) else WindowCloak { false }
+        )
+        host.cloak = cloak
+        val shown = try {
+            prewarmCloaked(
+                cloak = cloak,
+                show = { host.onScreen = true },
+                awaitFrames = {
+                    withTimeoutOrNull(FIRST_FRAME_TIMEOUT_MILLIS) {
+                        withFrameNanos { }
+                        withFrameNanos { }
+                    }
+                },
+                hide = {
+                    awaitAwtEventTurn()
+                    host.onScreen = false
+                },
+                awaitHidden = { awaitWindowHidden(window) }
+            )
         } finally {
-            withContext(NonCancellable) {
-                awaitAwtEventTurn()
-                host.onScreen = false
-                window.focusableWindowState = wasFocusable
-            }
+            withContext(NonCancellable) { window.focusableWindowState = wasFocusable }
         }
+        if (!shown) return
         breadcrumbs.record(
             BreadcrumbCategory.NAVIGATION,
             modalPrewarmedBreadcrumb(diagnosticName, (System.nanoTime() - startedAt) / 1_000_000)
         )
     }
+}
+
+/**
+ * Espera a AWT tirar a janela da tela: o DWM só libera o cloak depois disso. Sonda a cada 5 ms
+ * com teto de 1 s, sem esperar quadro, que pode nunca chegar.
+ */
+private suspend fun awaitWindowHidden(window: java.awt.Window) {
+    awaitUntil(timeoutMillis = 1_000L, stepMillis = 5L) { !window.isVisible }
 }
 
 private suspend fun fadeWindow(

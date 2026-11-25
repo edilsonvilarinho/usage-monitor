@@ -172,3 +172,9 @@ internal fun <T : Any> rememberLastNonNull(value: T?): T? {
 internal class LastValue<T : Any> {
     var value: T? = null
 }
+
+/**
+ * Cloak DWM da janela pré-aquecida: só no Windows, a única plataforma com `DwmSetWindowAttribute`.
+ */
+internal fun shouldCloakModalWindow(platform: AutoStartManager.Platform): Boolean =
+    platform == AutoStartManager.Platform.WINDOWS

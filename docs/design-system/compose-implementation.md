@@ -66,15 +66,19 @@ quadros, um percentual que não é verdade.
     ao fechar. Janela já aberta e escondida há 60 s (`MODAL_IDLE_RELEASE_MILLIS`) sai da composição; a pré-aquecida
     que nunca abriu fica, e a liberada não é pré-aquecida de novo (`shouldReleaseHiddenModalWindow`,
     `shouldCreateModalWindow`). Medido com NMT: 6 janelas, 1.417–1.440 MB privados; liberadas, 1.098–1.105 MB.
-  - **Pré-aquecimento (opt-in `prewarm = true`).** Mesmo viva, a primeira abertura seguia lenta: a
-    trilha do 41.6.0-beta.2 mediu 230–515 ms do pedido ao quadro (fora a criação da janela e os
-    680 ms do E9), contra 42–89 ms das reaberturas. Contado da HUD pintada — 0,8 s para as
-    Configurações, 2,5 s para as demais (`ModalWindowEnvironment.prewarmReady`); os 10 s fixos da
-    primeira versão perderam o clique real, 4 s depois da HUD —, Configurações, Sessões CLI e Ajuda nascem, aparecem
-    **transparentes e sem foco** (`focusableWindowState = false`) por dois quadros e se escondem —
-    uma por vez (`Mutex`), sem contar como abertura (linha "pré-aquecida" na trilha). Só no Windows
-    com translucidez (`shouldPrewarmModalWindow`, #340). Histórico não entra: precisa de fonte.
-    Janela nova só pede o pré-aquecimento se for aberta com frequência — cada uma viva guarda
+  - **Pré-aquecimento (opt-in `prewarm = true`).** Mesmo viva, a primeira abertura seguia lenta: a trilha do
+    41.6.0-beta.2 mediu 230–515 ms do pedido ao quadro (fora a criação da janela e os 680 ms do E9),
+    contra 42–89 ms das reaberturas. Contado da HUD pintada — 0,8 s para as Configurações, 2,5 s para as
+    demais (`ModalWindowEnvironment.prewarmReady`); os 10 s fixos da primeira versão perderam o clique real,
+    4 s depois da HUD —, Configurações, Sessões CLI e Ajuda nascem, aparecem **escondidas pelo cloak do
+    DWM (`DWMWA_CLOAK`), com opacidade 0 e sem foco** (`focusableWindowState = false`) por dois quadros, e se
+    escondem — o cloak só sai depois de a AWT tirar a janela da tela (`awaitAwtEventTurn` antes de
+    `host.onScreen = false`; espera por `awaitUntil`, sonda de 5 ms com teto de 1 s). Opacidade 0 é a segunda
+    barreira. Medido: sem o cloak, 39 de 960 partidas piscaram (runs 45608664012 e 45612516405); com o cloak,
+    0 de 480, e 0 de 240 delas mesmo com opacidade 1; esperar 150 ms entre a opacidade e o mostrar não
+    resolveu (2 de 240) — uma por vez (`Mutex`), sem contar como abertura (linha "pré-aquecida" na trilha).
+    Só no Windows com translucidez (`shouldPrewarmModalWindow`, #340). Histórico não entra: precisa de
+    fonte. Janela nova só pede o pré-aquecimento se for aberta com frequência — cada uma viva guarda
     contexto de GPU.
   - **A entrada espera o primeiro quadro pintado.** A escala da moldura começava ao compor, dentro de
     uma janela que o sistema mostrava de uma vez e opaca, e os quadros iniciais se perdiam no custo
