@@ -13,8 +13,13 @@ on:
       - 'src/desktopMain/**/presentation/ui/Hud*.kt'
       - 'src/commonMain/**/AppGargantua*.kt'
       - 'src/commonMain/**/Hud*.kt'
-      - 'tools/real-app/**'
+      - 'tools/real-app/record.ps1'
+      - 'tools/real-app/seed.ps1'
+      - 'tools/real-app/defects.json'
+      - 'tools/real-app/plant-defect.mjs'
       - 'tools/ci/hud-pulses.mjs'
+      - 'tools/ci/recording-health.mjs'
+      - 'tools/real-app/scenes.json'
       - '.github/workflows/real-app.yml'
   workflow_dispatch:
     inputs:
@@ -215,6 +220,7 @@ jobs:
           $rows = [System.Collections.Generic.List[string]]::new()
           $details = [System.Collections.Generic.List[string]]::new()
           $failed = 0
+          $judged = 0
           $fence = '```'
           foreach ($scenario in ($env:SCENARIOS -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
               $dataDir = Join-Path $env:DATA_DIR $scenario
@@ -274,21 +280,30 @@ jobs:
                   } else {
                       $detectorArgs += @('--max-rest-foreground', '2100', '--max-foreground', '35000')
                   }
+                  # Só a gravação source tem a cena em tools/real-app/scenes.json; tag não recebe --scene.
+                  if ($env:RELEASE_VERSION.StartsWith('source')) { $detectorArgs += @('--scene', $scenario) }
                   node tools/ci/hud-pulses.mjs @detectorArgs *> $verdictPath
                   $code = $LASTEXITCODE
                   $obtained = (Get-Content -LiteralPath $verdictPath -TotalCount 1)
+                  $judged++
                   $details.Add("$scenario (detector exit $code)`n$fence`n$(Get-Content -LiteralPath $verdictPath -Raw)$fence")
               }
 
+              # Saúde do registro (recording-health.mjs): só reprova o `source`; defeito plantado e tag publicada só registram.
+              $healthPath = Join-Path $outDir 'health.txt'
+              node tools/ci/recording-health.mjs $outDir *> $healthPath
+              $health = (Get-Content -LiteralPath $healthPath -TotalCount 1)
               $matched = ($recorded -and ($obtained -eq $expected)).ToString().ToLower()
               if ($matched -eq 'false') { $failed++ }
-              $rows.Add("| $scenario | $expected | $obtained | $matched |")
+              if ($health -ne 'ok' -and $env:RELEASE_VERSION -eq 'source') { $failed++ }
+              $rows.Add("| $scenario | $expected | $obtained | $matched | $health |")
               "$scenario expected: $expected obtained: $obtained matched: $matched"
           }
 
-          $table = @("$title", '', '| Scenario | Expected | Obtained | Matched |', '|---|---|---|---|') + $rows
+          $table = @("$title", '', '| Scenario | Expected | Obtained | Matched | Saúde |', '|---|---|---|---|---|') + $rows
           ($table -join "`n") + "`n" | Out-File -FilePath $summary -Append -Encoding utf8
           if ($details.Count -gt 0) { ($details -join "`n") + "`n" | Out-File -FilePath $summary -Append -Encoding utf8 }
+          if ($judged -eq 0) { $failed++; 'nada julgado: nenhum cenário chegou ao detector' }
           if ($failed -gt 0) {
               "$failed scenario(s) differ from the expectation or did not record"
               exit 1
