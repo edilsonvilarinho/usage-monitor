@@ -22,6 +22,7 @@ const EXIT_OK = 0
 const EXIT_ERROR = 1
 const EXIT_USAGE = 2
 const EXIT_REFUSED = 3
+const EXIT_UNMEASURED = 4
 const REFUSED_STOPS = ['key-refused', 'script-budget', 'pilot-budget', 'prompt-limit', 'cost-unknown']
 const ERROR_STOPS = ['driver-error', 'client-error']
 const LEDGER_FILE = join(REPO, 'tools', 'real-app', 'pilot-ledger.json')
@@ -190,11 +191,13 @@ export function childEnv(env) {
     return copy
 }
 
-// Código de saída: recusa de orçamento ou chave é 3; falha do driver ou do cliente é 1.
+// Código de saída: só done é 0; recusa de orçamento ou chave é 3; falha do driver ou do cliente é 1; o resto é 4 (não medido).
 export function exitCodeOf(stop) {
+    if (stop === 'done') return EXIT_OK
     if (REFUSED_STOPS.includes(stop)) return EXIT_REFUSED
     if (ERROR_STOPS.includes(stop)) return EXIT_ERROR
-    return EXIT_OK
+    // done-incomplete, max-steps, max-actions, no-tool-call e stuck: roteiro sem done aceito, resultado não medido.
+    return EXIT_UNMEASURED
 }
 
 function seedData({ dataDir, version, scenario, env }) {

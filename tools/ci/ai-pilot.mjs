@@ -11,6 +11,11 @@ export const LIMITS = Object.freeze({
     maxOutputTokens: 2048,
     maxWaitMs: 5000,
     maxTypeChars: 200,
+    maxActions: 150,
+    maxActionsPerTurn: 20,
+    maxRepeatStreak: 2,
+    maxRepeatRefusals: 6,
+    maxTotalWaitMs: 120000,
 })
 
 // Tolerância para soma de decimais em dólar: exatamente no limite continua permitido.
@@ -296,6 +301,23 @@ const CLICK_ONLY_ITEMS = ['minimize', 'restore']
 // Acrescentado às recusas de cover impossível: a tentativa é obrigatória também para dizer que não dá.
 const IMPOSSIBLE_TAIL = ' (impossível também exige a tentativa)'
 const POINTER_TOOLS = ['move', 'click', 'drag']
+const REPEAT_TEXT = 'erro: ação repetida; faça outra coisa'
+const TURN_TEXT = 'ignorado: limite por turno'
+const ZOOM_REPEAT_TEXT = 'erro: zoom repetido sem ação do ponteiro; mova, clique ou arraste antes de recortar de novo'
+const WAIT_TOTAL_TEXT = `erro: espera passa do teto de ${LIMITS.maxTotalWaitMs} ms no roteiro`
+
+// Sequência de chamadas iguais (nome + argumentos JSON), atravessando turnos. Recusa conta para o teto e não zera a sequência.
+function repeatRefusal(state, tool, args) {
+    const key = JSON.stringify([tool, args])
+    state.streak = key === state.streakKey ? state.streak + 1 : 1
+    state.streakKey = key
+    if (state.streak <= LIMITS.maxRepeatStreak) return null
+    state.repeatRefusals += 1
+    return { text: REPEAT_TEXT, stuck: state.repeatRefusals >= LIMITS.maxRepeatRefusals }
+}
+
+// Zoom do mesmo retângulo só volta a valer depois de ação do ponteiro.
+const zoomKeyOf = (action) => [action.x, action.y, action.w, action.h].join(',')
 
 // Motivo da recusa do cover entre as capturas A e B; null quando aceita. A linha do tempo só tem ações que o driver executou.
 // Impossível aceita imagens iguais: a tentativa é o que prova a impossibilidade.
@@ -353,6 +375,8 @@ async function executeTool(action, state, driver) {
         case 'screenshot':
             return captureResult(state, await driver.screenshot())
         case 'zoom':
+            if (state.zoomKey === zoomKeyOf(action)) return { text: ZOOM_REPEAT_TEXT }
+            state.zoomKey = zoomKeyOf(action)
             return captureResult(state, await driver.zoom(action), true)
         case 'check':
             return recordCheck(state, action)
@@ -361,9 +385,12 @@ async function executeTool(action, state, driver) {
         case 'report':
             return recordReport(state, action)
         default:
+            if (action.tool === 'wait' && state.waitedMs + action.ms > LIMITS.maxTotalWaitMs) return { text: WAIT_TOTAL_TEXT }
             await driver.perform(action)
             // Só entra na linha do tempo depois do driver aceitar: ação rejeitada não conta.
             state.timeline.push({ kind: 'action', tool: action.tool })
+            if (action.tool === 'wait') state.waitedMs += action.ms
+            if (POINTER_TOOLS.includes(action.tool)) state.zoomKey = null
             return { text: 'ok' }
     }
 }
@@ -373,6 +400,13 @@ async function runTurn({ toolCalls, messages, state, driver, screen }) {
     const images = []
     for (let index = 0; index < toolCalls.length; index += 1) {
         const toolCall = toolCalls[index]
+        // Toda chamada conta para o teto total, inclusive as ignoradas por limite de turno.
+        state.actions += 1
+        if (state.actions > LIMITS.maxActions) return { done: true, stop: 'max-actions', images }
+        if (index >= LIMITS.maxActionsPerTurn) {
+            messages.push(toolMessage(toolCall.id, TURN_TEXT))
+            continue
+        }
         const parsed = parseArguments(toolCall)
         const checked = parsed.ok ? validateAction(toolCall?.function?.name, parsed.args, screen) : bad(parsed.error)
         if (!checked.ok) {
@@ -385,6 +419,12 @@ async function runTurn({ toolCalls, messages, state, driver, screen }) {
             if (turn.done) return { done: true, stop: turn.stop, images }
             for (const rest of toolCalls.slice(index + 1)) messages.push(toolMessage(rest.id, 'ignorado: done recusado'))
             return { done: false, images }
+        }
+        const repeat = repeatRefusal(state, checked.action.tool, parsed.args)
+        if (repeat) {
+            messages.push(toolMessage(toolCall.id, repeat.text))
+            if (repeat.stuck) return { done: true, stop: 'stuck', images }
+            continue
         }
         const result = await executeTool(checked.action, state, driver)
         messages.push(toolMessage(toolCall.id, result.text))
@@ -420,6 +460,12 @@ export async function runScript({ client, driver, script, rules, screen, budget,
         doneRefusals: 0,
         zoomShots: new Set(),
         timeline: [],
+        actions: 0,
+        streak: 0,
+        streakKey: null,
+        repeatRefusals: 0,
+        waitedMs: 0,
+        zoomKey: null,
     }
     let first
     try {

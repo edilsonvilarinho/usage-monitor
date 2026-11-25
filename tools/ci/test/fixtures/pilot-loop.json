@@ -1,0 +1,1026 @@
+{
+ "source": "transcrito de final4/ai-pilot-paid-gear-balloon-bad-1/gear-balloon-bad-1/transcript.jsonl, turnos 1 a 60; só nomes e argumentos, sem imagens, sem usage",
+ "screen": {
+  "width": 1920,
+  "height": 1080
+ },
+ "turns": [
+  {
+   "toolCalls": [
+    {
+     "name": "screenshot",
+     "arguments": {}
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "move",
+     "arguments": {
+      "x": 512,
+      "y": 167
+     }
+    },
+    {
+     "name": "wait",
+     "arguments": {
+      "ms": 800
+     }
+    },
+    {
+     "name": "screenshot",
+     "arguments": {}
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 550,
+      "y": 0,
+      "w": 95,
+      "h": 500
+     }
+    },
+    {
+     "name": "move",
+     "arguments": {
+      "x": 596,
+      "y": 55
+     }
+    },
+    {
+     "name": "wait",
+     "arguments": {
+      "ms": 800
+     }
+    },
+    {
+     "name": "screenshot",
+     "arguments": {}
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 650,
+      "y": 0,
+      "w": 265,
+      "h": 215
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "check",
+     "arguments": {
+      "rule": 4,
+      "seen": "Semanal Reinicia 02/12 14h03",
+      "verdict": "ok",
+      "shot": 5
+     }
+    },
+    {
+     "name": "check",
+     "arguments": {
+      "rule": 7,
+      "seen": "Codex: 35% usado / 65% restante; Semanal 60% usado / 40% restante; barra da conta Codex weekly 60%, session 35%",
+      "verdict": "ok",
+      "shot": 5
+     }
+    },
+    {
+     "name": "check",
+     "arguments": {
+      "rule": 5,
+      "seen": "Codex — Example… (reticências normais); \"Sem projeção\" visível; textos do balão completos",
+      "verdict": "ok",
+      "shot": 5
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "move",
+     "arguments": {
+      "x": 596,
+      "y": 187
+     }
+    },
+    {
+     "name": "wait",
+     "arguments": {
+      "ms": 800
+     }
+    },
+    {
+     "name": "screenshot",
+     "arguments": {}
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "move",
+     "arguments": {
+      "x": 596,
+      "y": 320
+     }
+    },
+    {
+     "name": "wait",
+     "arguments": {
+      "ms": 800
+     }
+    },
+    {
+     "name": "screenshot",
+     "arguments": {}
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 640,
+      "y": 230,
+      "w": 280,
+      "h": 180
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "check",
+     "arguments": {
+      "rule": 7,
+      "seen": "Antigravity 50% usado / 50% restante; barra mostra 50%",
+      "verdict": "ok",
+      "shot": 8
+     }
+    },
+    {
+     "name": "check",
+     "arguments": {
+      "rule": 4,
+      "seen": "Sessão 5h Reinicia 19h03",
+      "verdict": "ok",
+      "shot": 8
+     }
+    },
+    {
+     "name": "move",
+     "arguments": {
+      "x": 596,
+      "y": 450
+     }
+    },
+    {
+     "name": "wait",
+     "arguments": {
+      "ms": 800
+     }
+    },
+    {
+     "name": "screenshot",
+     "arguments": {}
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "screenshot",
+     "arguments": {}
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "move",
+     "arguments": {
+      "x": 780,
+      "y": 600
+     }
+    },
+    {
+     "name": "wait",
+     "arguments": {
+      "ms": 1000
+     }
+    },
+    {
+     "name": "screenshot",
+     "arguments": {}
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "check",
+     "arguments": {
+      "rule": 9,
+      "seen": "Com o ponteiro longe da barra (captura 11), o balão da conta Antigravity fechou; só o planeta fica na tela",
+      "verdict": "ok",
+      "shot": 11
+     }
+    },
+    {
+     "name": "check",
+     "arguments": {
+      "rule": 8,
+      "seen": "Captura 11: nenhuma janela ou resto de desenho visível além do planeta e da barra fechada",
+      "verdict": "ok",
+      "shot": 11
+     }
+    },
+    {
+     "name": "check",
+     "arguments": {
+      "rule": 6,
+      "seen": "Barra e balões inteiros dentro da tela nas capturas 5, 6, 8",
+      "verdict": "ok",
+      "shot": 8
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "done",
+     "arguments": {
+      "summary": "Testei a barra com três contas (Codex, Cursor, Antigravity) e a tela de balões. Os balões abriram ao lado de cada conta, com os percentuais coerentes entre barra e balão (ex.: Codex 35% sessão / 60% semanal). Reinício semanal mostra data (02/12 14h03); sessão mostra hora (19h03). Ao afastar o ponteiro, o balão fechou e sobrou só o planeta. Não cheguei a testar minimizar/restaurar nem a engrenagem e o botão de planeta: ainda faltam as capturas de cobertura desses itens. Nenhuma regra violada registrada até aqui."
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "check",
+     "arguments": {
+      "rule": 1,
+      "seen": "Balões abriram ao lado de cada conta, alinhados com ela (captura 5 Codex, 6 Cursor, 8 Antigravity)",
+      "verdict": "ok",
+      "shot": 8
+     }
+    },
+    {
+     "name": "check",
+     "arguments": {
+      "rule": 3,
+      "seen": "Barra com três contas mostra anel, fundo e estrelas nas capturas 4 e 7; sem conta fora da barra",
+      "verdict": "ok",
+      "shot": 7
+     }
+    },
+    {
+     "name": "cover",
+     "arguments": {
+      "item": "every-account",
+      "seen": "Balões das três contas abertos (captura 5 Codex, 6 Cursor, 8 Antigravity) com ponteiro sobre cada uma",
+      "before": 3,
+      "after": 8,
+      "possible": true
+     }
+    },
+    {
+     "name": "cover",
+     "arguments": {
+      "item": "gear",
+      "seen": "Não testado: ponteiro não foi levado à engrenagem",
+      "before": 11,
+      "after": 11,
+      "possible": false
+     }
+    },
+    {
+     "name": "cover",
+     "arguments": {
+      "item": "minimize",
+      "seen": "Não testado: botão de menos não foi clicado",
+      "before": 11,
+      "after": 11,
+      "possible": false
+     }
+    },
+    {
+     "name": "cover",
+     "arguments": {
+      "item": "restore",
+      "seen": "Não testado: botão de mais não foi clicado",
+      "before": 11,
+      "after": 11,
+      "possible": false
+     }
+    },
+    {
+     "name": "cover",
+     "arguments": {
+      "item": "pointer-away",
+      "seen": "Captura 9/10 com balão aberto; captura 11 após afastar o ponteiro: balão fechado, só o planeta",
+      "before": 10,
+      "after": 11,
+      "possible": true
+     }
+    },
+    {
+     "name": "cover",
+     "arguments": {
+      "item": "other-buttons",
+      "seen": "Não testado: botões das pontas (planeta/engrenagem) não receberam ponteiro",
+      "before": 11,
+      "after": 11,
+      "possible": false
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "cover",
+     "arguments": {
+      "item": "every-account",
+      "seen": "Balões das três contas abertos com ponteiro sobre cada uma (captura 4 Codex, 6 Cursor, 7 Antigravity)",
+      "before": 3,
+      "after": 7,
+      "possible": true
+     }
+    },
+    {
+     "name": "cover",
+     "arguments": {
+      "item": "gear",
+      "seen": "Não testado: ponteiro não foi levado à engrenagem",
+      "before": 10,
+      "after": 11,
+      "possible": false
+     }
+    },
+    {
+     "name": "cover",
+     "arguments": {
+      "item": "minimize",
+      "seen": "Não testado: botão de menos não foi clicado",
+      "before": 10,
+      "after": 11,
+      "possible": false
+     }
+    },
+    {
+     "name": "cover",
+     "arguments": {
+      "item": "restore",
+      "seen": "Não testado: botão de mais não foi clicado",
+      "before": 10,
+      "after": 11,
+      "possible": false
+     }
+    },
+    {
+     "name": "cover",
+     "arguments": {
+      "item": "other-buttons",
+      "seen": "Não testado: botões das pontas não receberam ponteiro",
+      "before": 10,
+      "after": 11,
+      "possible": false
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "done",
+     "arguments": {
+      "summary": "Testei a barra com três contas (Codex, Cursor, Antigravity) e os balões. Os balões abriram alinhados a cada conta, e os percentuais batem entre barra e balão. Os reinícios mostram data (02/12 14h03) na semanal e hora (19h03) na sessão. Ao afastar o ponteiro, o balão fechou e sobrou só o planeta. Nenhuma regra violada foi encontrada. Não testei ainda: minimizar/restaurar pelo balão, a engrenagem e os botões das pontas (planeta e engrenagem) com o ponteiro sobre eles; esses itens ficaram sem cobertura."
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "move",
+     "arguments": {
+      "x": 596,
+      "y": 187
+     }
+    },
+    {
+     "name": "wait",
+     "arguments": {
+      "ms": 800
+     }
+    },
+    {
+     "name": "screenshot",
+     "arguments": {}
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "move",
+     "arguments": {
+      "x": 512,
+      "y": 167
+     }
+    },
+    {
+     "name": "wait",
+     "arguments": {
+      "ms": 800
+     }
+    },
+    {
+     "name": "screenshot",
+     "arguments": {}
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "move",
+     "arguments": {
+      "x": 596,
+      "y": 55
+     }
+    },
+    {
+     "name": "wait",
+     "arguments": {
+      "ms": 800
+     }
+    },
+    {
+     "name": "screenshot",
+     "arguments": {}
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "click",
+     "arguments": {
+      "x": 777,
+      "y": 188
+     }
+    },
+    {
+     "name": "wait",
+     "arguments": {
+      "ms": 800
+     }
+    },
+    {
+     "name": "screenshot",
+     "arguments": {}
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 540,
+      "y": 0,
+      "w": 400,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 540,
+      "y": 0,
+      "w": 380,
+      "h": 400
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 540,
+      "y": 0,
+      "w": 200,
+      "h": 400
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  },
+  {
+   "toolCalls": [
+    {
+     "name": "zoom",
+     "arguments": {
+      "x": 545,
+      "y": 0,
+      "w": 120,
+      "h": 410
+     }
+    }
+   ]
+  }
+ ]
+}

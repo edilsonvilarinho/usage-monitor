@@ -217,6 +217,7 @@ test('LIMITS: valores do briefing, congelados', () => {
     assert.deepEqual({ ...LIMITS }, {
         maxSteps: 60, maxPromptTokens: 100000, promptMargin: 4000, maxScriptUsd: 0.2, maxPilotUsd: 5,
         reserveUsd: 0.02, maxOutputTokens: 2048, maxWaitMs: 5000, maxTypeChars: 200,
+        maxActions: 150, maxActionsPerTurn: 20, maxRepeatStreak: 2, maxRepeatRefusals: 6, maxTotalWaitMs: 120000,
     });
     assert.equal(Object.isFrozen(LIMITS), true);
 });
@@ -315,7 +316,8 @@ test('runScript: done encerra com stop done, passos e relatorio', async () => {
 });
 
 test('runScript: 60 chamadas sem done param em max-steps', async () => {
-    const client = fakeClient([reply([call('w', 'wait', { ms: 0 })])]);
+    // Esperas com ms distintos: chamadas iguais seguidas disparariam a regra de repetição.
+    const client = fakeClient(Array.from({ length: 60 }, (_, index) => reply([call(`w${index}`, 'wait', { ms: index })])));
     const driver = fakeDriver();
     const result = await run(client, driver);
     assert.equal(result.stop, 'max-steps');
