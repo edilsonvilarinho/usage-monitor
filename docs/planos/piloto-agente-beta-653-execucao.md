@@ -78,6 +78,7 @@ na versão boa é conferido à mão antes de contar como falso.
 |---|---|---|
 | A01 | catálogo e `/api/v1/key` do OpenRouter; `git tag --contains` por caso | fatos acima; 9 casos, 4 na 1ª rodada. Nenhum foi visto na tela ainda: a A03 confirma que cada defeito aparece no runner antes de gastar |
 | A02 | `node --test tools/ci/test/ai-pilot.test.mjs` | vermelho (stub) 81 de 92, 1ª asserção `actual: { ok: true }, expected: { ok: false, reason: 'invalid-response' }`; verde 92/92. Devolvida 1x (descartava as ferramentas do último turno pago): vermelho `:315 actual: 0, expected: 1`, `:323 actual: 'script-budget', expected: 'done'`, `:333`, `:350` e `:474 actual: { confirmed: true, why: 'ok' }`; verde **95/95**, em execução independente. Nenhuma chamada paga, nenhuma rede. Cobertura do diff: `tools/ci` não é medido por Kover nem pelo lcov do servidor |
+| A03a | `node --test "tools/ci/test/*.test.mjs"` | vermelho (stub): `actual: { ok: false, reason: 'no-limit' }, expected: { ok: true, usage: 1.25 }`; `actual: null, expected: { width: 1920, height: 1080 }`; `actual: [], expected: [ { id: 1, tool: 'screenshot' } ]`; `Missing expected rejection`. Verde 254/254 na pasta (21 novos). Decisões do dono trocaram o contrato: `limit: null` aceito, `limit-too-high` some, `usage` da chave vira o gasto acumulado (`pilot-budget`), e o cliente recusa modelo que não seja `anthropic/claude-haiku-5.5` |
 
 ## Problemas em aberto e riscos
 

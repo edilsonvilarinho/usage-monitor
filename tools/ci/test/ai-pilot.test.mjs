@@ -6,7 +6,7 @@ import { inspect } from 'node:util';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-    LIMITS, TOOLS, checkKey, confirmReport, createBudget, createOpenRouterClient, runScript, validateAction,
+    LIMITS, MODEL, TOOLS, checkKey, confirmReport, createBudget, createOpenRouterClient, runScript, validateAction,
 } from '../ai-pilot.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -73,8 +73,8 @@ function fakeFetch(response) {
 
 // --- checkKey ---
 
-test('checkKey: limite 5 e saldo igual ao piso passam', () => {
-    assert.deepEqual(checkKey({ data: { limit: 5, limit_remaining: 0.3 } }), { ok: true });
+test('checkKey: limite 5 e saldo igual ao piso passam e devolvem o uso', () => {
+    assert.deepEqual(checkKey({ data: { limit: 5, limit_remaining: 0.3, usage: 0.5 } }), { ok: true, usage: 0.5 });
 });
 
 test('checkKey: sem data ou corpo nulo e invalid-response', () => {
@@ -93,20 +93,34 @@ test('checkKey: limit definido sem limit_remaining finito e invalid-response', (
     assert.deepEqual(checkKey({ data: { limit: 5, limit_remaining: null } }), { ok: false, reason: 'invalid-response' });
 });
 
-test('checkKey: limit null e no-limit', () => {
-    assert.deepEqual(checkKey({ data: { limit: null, limit_remaining: null } }), { ok: false, reason: 'no-limit' });
+test('checkKey: limit null passa sem exigir limit_remaining', () => {
+    assert.deepEqual(checkKey({ data: { limit: null, usage: 1.25 } }), { ok: true, usage: 1.25 });
 });
 
-test('checkKey: limit acima de 5 e limit-too-high', () => {
-    assert.deepEqual(checkKey({ data: { limit: 6, limit_remaining: 1 } }), { ok: false, reason: 'limit-too-high' });
+test('checkKey: limit acima de 5 passa, sem teto de limite', () => {
+    assert.deepEqual(checkKey({ data: { limit: 6, limit_remaining: 1, usage: 0 } }), { ok: true, usage: 0 });
 });
 
 test('checkKey: saldo abaixo do piso e remaining-too-low', () => {
-    assert.deepEqual(checkKey({ data: { limit: 5, limit_remaining: 0.29 } }), { ok: false, reason: 'remaining-too-low' });
+    assert.deepEqual(checkKey({ data: { limit: 5, limit_remaining: 0.29, usage: 0 } }), { ok: false, reason: 'remaining-too-low' });
 });
 
-test('checkKey: ordem das razoes: invalid-response vence limit-too-high', () => {
-    assert.deepEqual(checkKey({ data: { limit: 6, limit_remaining: 'x' } }), { ok: false, reason: 'invalid-response' });
+test('checkKey: remaining nao finito e invalid-response mesmo com limite acima de 5', () => {
+    assert.deepEqual(checkKey({ data: { limit: 6, limit_remaining: 'x', usage: 0 } }), { ok: false, reason: 'invalid-response' });
+});
+
+test('checkKey: usage ausente, negativo, string ou nao finito e invalid-response', () => {
+    for (const usage of [undefined, null, '0', -0.01, NaN, Infinity]) {
+        assert.deepEqual(checkKey({ data: { limit: 5, limit_remaining: 1, usage } }), { ok: false, reason: 'invalid-response' }, String(usage));
+    }
+});
+
+test('checkKey: uso acima do teto do piloto com a reserva e pilot-budget', () => {
+    assert.deepEqual(checkKey({ data: { limit: 5, limit_remaining: 1, usage: 4.96 } }), { ok: false, reason: 'pilot-budget' });
+});
+
+test('checkKey: uso mais reserva exatamente no teto do piloto passa', () => {
+    assert.deepEqual(checkKey({ data: { limit: null, usage: 4.95 } }), { ok: true, usage: 4.95 });
 });
 
 // --- createBudget ---
@@ -538,7 +552,7 @@ const OK_BODY = {
 
 test('createOpenRouterClient: POST no endpoint com exatamente os dois headers', async () => {
     const { fetch, calls } = fakeFetch(jsonResponse(200, OK_BODY));
-    const client = createOpenRouterClient({ fetch, apiKey: KEY, model: 'modelo-teste' });
+    const client = createOpenRouterClient({ fetch, apiKey: KEY, model: MODEL });
     await client.complete({ messages: [], tools: TOOLS, maxTokens: 1024 });
     assert.equal(calls.length, 1);
     assert.equal(calls[0].url, 'https://openrouter.ai/api/v1/chat/completions');
@@ -549,10 +563,10 @@ test('createOpenRouterClient: POST no endpoint com exatamente os dois headers', 
 
 test('createOpenRouterClient: corpo com model, tool_choice padrao required e usage include', async () => {
     const { fetch, calls } = fakeFetch(jsonResponse(200, OK_BODY));
-    const client = createOpenRouterClient({ fetch, apiKey: KEY, model: 'modelo-teste' });
+    const client = createOpenRouterClient({ fetch, apiKey: KEY, model: MODEL });
     await client.complete({ messages: [{ role: 'user', content: 'oi' }], tools: TOOLS, maxTokens: 1024 });
     const body = JSON.parse(calls[0].init.body);
-    assert.equal(body.model, 'modelo-teste');
+    assert.equal(body.model, MODEL);
     assert.equal(body.tool_choice, 'required');
     assert.equal(body.max_tokens, 1024);
     assert.deepEqual(body.usage, { include: true });
@@ -562,7 +576,7 @@ test('createOpenRouterClient: corpo com model, tool_choice padrao required e usa
 
 test('createOpenRouterClient: toolChoice informado substitui o padrao', async () => {
     const { fetch, calls } = fakeFetch(jsonResponse(200, OK_BODY));
-    const client = createOpenRouterClient({ fetch, apiKey: KEY, model: 'modelo-teste' });
+    const client = createOpenRouterClient({ fetch, apiKey: KEY, model: MODEL });
     const toolChoice = { type: 'function', function: { name: 'verdict' } };
     await client.complete({ messages: [], tools: TOOLS, maxTokens: 1024, toolChoice });
     assert.deepEqual(JSON.parse(calls[0].init.body).tool_choice, toolChoice);
@@ -570,7 +584,7 @@ test('createOpenRouterClient: toolChoice informado substitui o padrao', async ()
 
 test('createOpenRouterClient: devolve message e usage da resposta', async () => {
     const { fetch } = fakeFetch(jsonResponse(200, OK_BODY));
-    const client = createOpenRouterClient({ fetch, apiKey: KEY, model: 'modelo-teste' });
+    const client = createOpenRouterClient({ fetch, apiKey: KEY, model: MODEL });
     const result = await client.complete({ messages: [], tools: TOOLS, maxTokens: 1024 });
     assert.deepEqual(result.message, OK_BODY.choices[0].message);
     assert.deepEqual(result.usage, OK_BODY.usage);
@@ -584,7 +598,7 @@ test('createOpenRouterClient: status 401 checa ok antes de parsear e redige a ch
         text: async () => `chave invalida ${KEY}`,
     };
     const { fetch, calls } = fakeFetch(response);
-    const client = createOpenRouterClient({ fetch, apiKey: KEY, model: 'modelo-teste' });
+    const client = createOpenRouterClient({ fetch, apiKey: KEY, model: MODEL });
     await assert.rejects(client.complete({ messages: [], tools: TOOLS, maxTokens: 1024 }), (error) => {
         assert.equal(error.message.includes(KEY), false);
         assert.equal(error.message.includes('[redacted]'), true);
@@ -597,7 +611,7 @@ test('createOpenRouterClient: status 401 checa ok antes de parsear e redige a ch
 
 test('createOpenRouterClient: falha do fetch com a chave na mensagem vira erro redigido sem cause', async () => {
     const { fetch } = fakeFetch(new Error(`falha de rede usando ${KEY}`));
-    const client = createOpenRouterClient({ fetch, apiKey: KEY, model: 'modelo-teste' });
+    const client = createOpenRouterClient({ fetch, apiKey: KEY, model: MODEL });
     await assert.rejects(client.complete({ messages: [], tools: TOOLS, maxTokens: 1024 }), (error) => {
         assert.equal(error.message.includes(KEY), false);
         assert.equal(error.message.includes('[redacted]'), true);
@@ -608,10 +622,21 @@ test('createOpenRouterClient: falha do fetch com a chave na mensagem vira erro r
 
 test('createOpenRouterClient: chave nao aparece em JSON, Object.keys nem inspect do cliente', () => {
     const { fetch } = fakeFetch(jsonResponse(200, OK_BODY));
-    const client = createOpenRouterClient({ fetch, apiKey: KEY, model: 'modelo-teste' });
+    const client = createOpenRouterClient({ fetch, apiKey: KEY, model: MODEL });
     assert.equal(JSON.stringify(client).includes(KEY), false);
     assert.equal(inspect(client, { showHidden: true, depth: 5 }).includes(KEY), false);
     assert.equal(Object.keys(client).some((name) => client[name] === KEY || String(client[name]).includes(KEY)), false);
+});
+
+test('MODEL: somente Haiku 5.5 via OpenRouter', () => {
+    assert.equal(MODEL, 'anthropic/claude-haiku-5.5');
+});
+
+test('createOpenRouterClient: recusa qualquer modelo diferente de MODEL, sem criar cliente', () => {
+    const { fetch, calls } = fakeFetch(jsonResponse(200, OK_BODY));
+    assert.throws(() => createOpenRouterClient({ fetch, apiKey: KEY, model: 'openai/gpt-4o' }), /modelo não permitido/);
+    assert.throws(() => createOpenRouterClient({ fetch, apiKey: KEY, model: undefined }), /modelo não permitido/);
+    assert.equal(calls.length, 0);
 });
 
 test('ai-pilot.mjs: fonte sem fs, process.env nem child_process', () => {
