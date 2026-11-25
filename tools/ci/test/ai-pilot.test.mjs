@@ -78,7 +78,7 @@ function fakeFetch(response) {
 // --- checkKey ---
 
 test('checkKey: limite 5 e saldo igual ao piso passam e devolvem o uso', () => {
-    assert.deepEqual(checkKey({ data: { limit: 5, limit_remaining: 0.1, usage: 0.5 } }), { ok: true, usage: 0.5 });
+    assert.deepEqual(checkKey({ data: { limit: 5, limit_remaining: 0.2, usage: 0.5 } }), { ok: true, usage: 0.5 });
 });
 
 test('checkKey: sem data ou corpo nulo e invalid-response', () => {
@@ -215,8 +215,8 @@ test('TOOLS: lista as doze ferramentas do método como schemas de funcao', () =>
 
 test('LIMITS: valores do briefing, congelados', () => {
     assert.deepEqual({ ...LIMITS }, {
-        maxSteps: 60, maxPromptTokens: 100000, promptMargin: 4000, maxScriptUsd: 0.1, maxPilotUsd: 5,
-        reserveUsd: 0.02, maxOutputTokens: 1024, maxWaitMs: 5000, maxTypeChars: 200,
+        maxSteps: 60, maxPromptTokens: 100000, promptMargin: 4000, maxScriptUsd: 0.2, maxPilotUsd: 5,
+        reserveUsd: 0.02, maxOutputTokens: 2048, maxWaitMs: 5000, maxTypeChars: 200,
     });
     assert.equal(Object.isFrozen(LIMITS), true);
 });
