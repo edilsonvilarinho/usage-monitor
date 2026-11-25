@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { childEnv, exitCodeOf, parseArgs, parseJobs, planEvidence, planRun, renderReport, runDry, runPaid } from '../ai-pilot-run.mjs';
+import { childEnv, exitCodeOf, parseArgs, parseJobs, planBudget, planEvidence, planRun, renderReport, runDry, runPaid } from '../ai-pilot-run.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REAL_APP = resolve(HERE, '..', '..', 'real-app');
@@ -375,4 +375,53 @@ test('laço e confirmações juntos não passam de maxScriptUsd: confirmação c
     assert.equal(result.reports[0].why, 'script-budget');
     assert.equal(client.calls.verdict, 0);
     assert.ok(result.costUsd <= 0.2 + 1e-9);
+});
+
+// Mutantes sobreviventes (#676, item 6b): limites exatos, detalhe e gasto da chave.
+test('parseArgs recusa flag sem valor no fim, com a mensagem de valor ausente', () => {
+    assert.deepEqual(parseArgs([...FULL_ARGV, '--out']), { ok: false, error: 'valor ausente para --out' });
+});
+
+test('planBudget aceita exatamente no teto com a tolerância de 1e-9 e recusa acima dela', () => {
+    assert.deepEqual(planBudget({ ledgerUsd: 0, jobs: 1, maxScriptUsd: 5 + 1e-9, maxPilotUsd: 5 }), { ok: true, worstCaseUsd: 5 + 1e-9 });
+    assert.equal(planBudget({ ledgerUsd: 0, jobs: 1, maxScriptUsd: 5 + 2e-9, maxPilotUsd: 5 }).ok, false);
+});
+
+test('runPaid copia o detalhe do roteiro só quando ele existe', async () => {
+    const failing = await runPaid({
+        fetchKey: fakeFetchKey(keyBody(0.2), keyBody(0.3)),
+        makeClient: () => ({ complete: async () => { throw new Error('rede caiu'); } }),
+        driver: fakeDriver(), script: SCRIPT, rules: RULES, screen: SCREEN,
+    });
+    assert.equal(failing.stop, 'client-error');
+    assert.equal(failing.detail, 'rede caiu');
+    const done = await runPaid({
+        fetchKey: fakeFetchKey(keyBody(0.2), keyBody(0.3)),
+        makeClient: () => fakeClient([reply([...ALL_OK, call('1', 'done', { summary: 'ok' })])]),
+        driver: fakeDriver(), script: SCRIPT, rules: RULES, screen: SCREEN,
+    });
+    assert.equal('detail' in done, false);
+});
+
+test('runPaid lê o gasto final como null quando não é número finito e quando a leitura falha', async () => {
+    const bodies = [{ data: { limit: null, limit_remaining: null, usage: '0.5' } }, { data: { limit: null, limit_remaining: null, usage: Infinity } }];
+    for (const body of bodies) {
+        const result = await runPaid({
+            fetchKey: fakeFetchKey(keyBody(0.2), body),
+            makeClient: () => fakeClient([reply([...ALL_OK, call('1', 'done', { summary: 'ok' })])]),
+            driver: fakeDriver(), script: SCRIPT, rules: RULES, screen: SCREEN,
+        });
+        assert.equal(result.keyUsageAfter, null);
+    }
+    let reads = 0;
+    const failed = await runPaid({
+        fetchKey: async () => {
+            reads += 1;
+            if (reads === 1) return keyBody(0.2);
+            throw new Error('rede');
+        },
+        makeClient: () => fakeClient([reply([...ALL_OK, call('1', 'done', { summary: 'ok' })])]),
+        driver: fakeDriver(), script: SCRIPT, rules: RULES, screen: SCREEN,
+    });
+    assert.equal(failed.keyUsageAfter, null);
 });

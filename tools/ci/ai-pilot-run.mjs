@@ -240,7 +240,7 @@ async function writeEvidence(out, files) {
     }
 }
 
-async function runMode({ mode, driver, item, env, out, caseId, side, version }) {
+async function runMode({ mode, driver, item, env, out, caseId, side, version, cases, rules, io }) {
     if (mode === 'dry') {
         const shots = await runDry({ driver, probe: item.probe })
         await writeEvidence(out, shots.map((shot) => ({ rel: `evidence/${String(shot.step).padStart(3, '0')}.jpg`, base64: shot.image })))
@@ -251,12 +251,10 @@ async function runMode({ mode, driver, item, env, out, caseId, side, version }) 
     }
     const apiKey = env.OPENROUTER_API_KEY
     const screen = await driver.ready()
-    const rules = await readFile(RULES_FILE, 'utf8')
-    const cases = JSON.parse(await readFile(CASES_FILE, 'utf8'))
-    const fetchKey = async () => (await fetch(KEY_URL, { headers: { Authorization: `Bearer ${apiKey}` } })).json()
+    const fetchKey = async () => (await io.fetch(KEY_URL, { headers: { Authorization: `Bearer ${apiKey}` } })).json()
     const turns = []
     const confirming = { on: false }
-    const makeClient = () => recordingClient(createOpenRouterClient({ fetch, apiKey, model: MODEL }), (turn) => turns.push({ ...turn, confirmation: confirming.on }))
+    const makeClient = () => recordingClient(createOpenRouterClient({ fetch: io.fetch, apiKey, model: MODEL }), (turn) => turns.push({ ...turn, confirmation: confirming.on }))
     const markConfirming = (on) => { confirming.on = on }
     const result = await runPaid({ fetchKey, makeClient, driver, script: cases.script, rules, screen, coverage: cases.coverage ?? [], markConfirming })
     const plan = planEvidence(result)
@@ -268,41 +266,57 @@ async function runMode({ mode, driver, item, env, out, caseId, side, version }) 
 }
 
 // `--plan-budget --jobs n`: confere o pior caso do lote contra o teto do piloto, sem rede e sem driver. Sai 3 se passa do teto.
-async function planMain(argv) {
+async function planMain(argv, io) {
     const jobs = parseJobs(argv)
     if (jobs === null) {
-        process.stderr.write('uso: --plan-budget --jobs <inteiro maior que 0>\n')
+        io.stderr('uso: --plan-budget --jobs <inteiro maior que 0>\n')
         return EXIT_USAGE
     }
-    const ledger = JSON.parse(await readFile(LEDGER_FILE, 'utf8'))
+    const ledger = await io.readLedger()
     const plan = planBudget({ ledgerUsd: ledger.spentUsd, jobs, maxScriptUsd: LIMITS.maxScriptUsd, maxPilotUsd: LIMITS.maxPilotUsd })
-    process.stdout.write(`pior caso: ${plan.worstCaseUsd.toFixed(4)} USD de ${LIMITS.maxPilotUsd} USD\n`)
+    io.stdout(`pior caso: ${plan.worstCaseUsd.toFixed(4)} USD de ${LIMITS.maxPilotUsd} USD\n`)
     return plan.ok ? EXIT_OK : EXIT_REFUSED
 }
 
-async function main(argv, env) {
-    if (argv[0] === '--plan-budget') return planMain(argv.slice(1))
+// Efeitos reais por padrão; os testes trocam por fakes via `deps`.
+const DEFAULT_DEPS = {
+    seed: seedData,
+    spawnDriver,
+    fetch,
+    readCases: async () => JSON.parse(await readFile(CASES_FILE, 'utf8')),
+    readRules: () => readFile(RULES_FILE, 'utf8'),
+    readLedger: async () => JSON.parse(await readFile(LEDGER_FILE, 'utf8')),
+    stdout: (text) => process.stdout.write(text),
+    stderr: (text) => process.stderr.write(text),
+}
+
+// Devolve o código de saída; não chama `process.exit`. Seed e driver recebem o ambiente sem a chave da OpenRouter.
+export async function main(argv, env, deps = {}) {
+    const io = { ...DEFAULT_DEPS, ...deps }
+    if (argv[0] === '--plan-budget') return planMain(argv.slice(1), io)
     const parsed = parseArgs(argv)
     if (!parsed.ok) {
-        process.stderr.write(`${parsed.error}\n`)
+        io.stderr(`${parsed.error}\n`)
         return EXIT_USAGE
     }
     const { mode, caseId, side, exe, dataDir, out } = parsed.options
-    const cases = JSON.parse(await readFile(CASES_FILE, 'utf8'))
+    const cases = await io.readCases()
     const plan = planRun({ caseId, side, mode }, cases, env)
     if (!plan.ok) {
-        process.stderr.write(`${plan.error}\n`)
+        io.stderr(`${plan.error}\n`)
         return plan.exit
     }
     const { item, version } = plan
+    const childEnvironment = childEnv(env)
     let driver = null
     try {
         await mkdir(out, { recursive: true })
-        await seedData({ dataDir, version, scenario: item.scenario, env })
-        driver = spawnDriver({ exe, dataDir, out, env })
-        return await runMode({ mode, driver, item, env, out, caseId, side, version })
+        await io.seed({ dataDir, version, scenario: item.scenario, env: childEnvironment })
+        driver = io.spawnDriver({ exe, dataDir, out, env: childEnvironment })
+        const rules = mode === 'paid' ? await io.readRules() : null
+        return await runMode({ mode, driver, item, env, out, caseId, side, version, cases, rules, io })
     } catch (error) {
-        process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
+        io.stderr(`${error instanceof Error ? error.message : String(error)}\n`)
         return EXIT_ERROR
     } finally {
         if (driver) await driver.close()
@@ -312,6 +326,7 @@ async function main(argv, env) {
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
     main(process.argv.slice(2), process.env).then((code) => { process.exitCode = code })
 }
+
 
 // Envolve o cliente: cada resposta vai para `onTurn` sem imagem nem chave; a resposta segue intacta.
 export function recordingClient(client, onTurn) {
