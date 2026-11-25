@@ -35,6 +35,8 @@ const reply = (toolCalls, cost = 0.001) => ({ message: { content: null, tool_cal
 const call = (id, name, args) => ({ id, type: 'function', function: { name, arguments: JSON.stringify(args) } });
 const keyBody = (usage, limit = null) => ({ data: { limit, limit_remaining: limit === null ? null : limit - usage, usage } });
 const fakeFetchKey = (...bodies) => async () => (bodies.length > 1 ? bodies.shift() : bodies[0]);
+// Checks das nove regras ok na captura 1: libera done sem pendência.
+const ALL_OK = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((rule) => call(`k${rule}`, 'check', { rule, shot: 1, seen: 'texto', verdict: 'ok' }));
 
 // Cliente falso: o laço consome `loopReplies` na ordem (a última repete); a confirmação responde `verdictReply`.
 function fakeClient(loopReplies, verdictReply = reply([call('v', 'verdict', { confirmed: true, why: 'visível' })])) {
@@ -106,7 +108,7 @@ test('runPaid recusa a chave antes de criar qualquer cliente', async () => {
 test('runPaid roda o laço e lê o gasto da chave de novo no fim', async () => {
     const result = await runPaid({
         fetchKey: fakeFetchKey(keyBody(0.2), keyBody(0.5)),
-        makeClient: () => fakeClient([reply([call('1', 'done', { summary: 'ok' })])]),
+        makeClient: () => fakeClient([reply([...ALL_OK, call('1', 'done', { summary: 'ok' })])]),
         driver: fakeDriver(), script: SCRIPT, rules: RULES, screen: SCREEN,
     });
     assert.equal(result.stop, 'done');
@@ -118,8 +120,9 @@ test('runPaid roda o laço e lê o gasto da chave de novo no fim', async () => {
 });
 
 test('runPaid limita a três confirmações e marca o resto como confirm-cap', async () => {
-    const report = (n) => call(`r${n}`, 'report', { title: `achado ${n}`, rule: '1', where: 'balão' });
-    const client = fakeClient([reply([report(1), report(2), report(3), report(4), call('d', 'done', { summary: 'ok' })])]);
+    const report = (n) => call(`r${n}`, 'report', { title: `achado ${n}`, rule: 1, shot: 1, seen: 'texto', expected: 'esperado' });
+    const violated = call('v', 'check', { rule: 1, shot: 1, seen: 'texto', verdict: 'violated' });
+    const client = fakeClient([reply([violated, report(1), report(2), report(3), report(4), ...ALL_OK.slice(1), call('d', 'done', { summary: 'ok' })])]);
     const result = await runPaid({
         fetchKey: fakeFetchKey(keyBody(0.2), keyBody(0.3)),
         makeClient: () => client,
@@ -154,13 +157,13 @@ test('renderReport escreve em português, escapa a tabela e não imprime base64'
     const result = {
         stop: 'done', steps: 3, costUsd: 0.1234, keyUsageBefore: 1.5, keyUsageAfter: null,
         reports: [
-            { step: 2, title: 'Balão | corta\nlinha', rule: '1', where: 'barra', shot: 'evidence/001.jpg', confirmed: true, why: 'ok' },
+            { step: 2, title: 'Balão | corta\nlinha', rule: '1', where: 'barra', shot: 'evidence/001.jpg', shotNumber: 1, seen: 'Balão | corta', expected: 'balão inteiro', confirmed: true, why: 'ok' },
             { step: 3, title: 'Texto sobreposto', rule: '5', where: 'balão', shot: 'evidence/002.jpg', confirmed: false, why: 'sem marca' },
             { step: 4, title: 'Conta fora', rule: '3', where: 'barra', shot: 'evidence/003.jpg', confirmed: null, why: 'confirm-cap', screenshot: 'SEGREDO-BASE64' },
         ],
     };
     const md = renderReport(result, { caseId: 'gear-balloon', side: 'bad', version: 'v42.3.0-beta.12' });
-    for (const text of ['gear-balloon', 'v42.3.0-beta.12', '0.1234', '1.5', 'Balão \\| corta linha', 'evidence/001.jpg', 'confirmado', 'não confirmado', 'não medido: confirm-cap']) {
+    for (const text of ['gear-balloon', 'v42.3.0-beta.12', '0.1234', '1.5', 'Balão \\| corta linha', 'evidence/001.jpg', 'confirmado', 'não confirmado', 'não medido: confirm-cap', '- Lido: Balão \\| corta', '- Pedido: balão inteiro', '- Captura nº 1']) {
         assert.ok(md.includes(text), text);
     }
     assert.equal(md.includes('SEGREDO-BASE64'), false);
@@ -178,7 +181,7 @@ test('childEnv tira a chave da OpenRouter do ambiente do filho sem mudar o origi
 
 const rawCases = readFileSync(CASES_PATH, 'utf8');
 const cases = JSON.parse(rawCases);
-const ids = Object.keys(cases).filter((key) => key !== 'script');
+const ids = Object.keys(cases).filter((key) => !['script', 'coverage', 'coverageLabels'].includes(key));
 const seedLine = readFileSync(SEED_PATH, 'utf8').split('\n').find((line) => line.includes('ValidateSet('));
 const SCENARIOS = [...seedLine.matchAll(/'([^']+)'/g)].map((match) => match[1]);
 
@@ -268,4 +271,59 @@ test('transcriptJsonl grava uma linha por turno e marca as confirmações', () =
     const lines = runner.transcriptJsonl(turns).split('\n').filter(Boolean).map((line) => JSON.parse(line))
     assert.equal(lines.length, 2)
     assert.deepEqual(lines.map((line) => line.confirmation), [false, true])
+});
+
+test('report com shot inexistente é recusado e não entra em reports', async () => {
+    const report = call('r', 'report', { title: 'achado fantasma', rule: 1, shot: 9, seen: 'texto', expected: 'esperado' });
+    const violated = call('v', 'check', { rule: 1, shot: 1, seen: 'texto', verdict: 'violated' });
+    const client = fakeClient([reply([violated, report, ...ALL_OK.slice(1), call('d', 'done', { summary: 'ok' })])]);
+    const result = await runPaid({
+        fetchKey: fakeFetchKey(keyBody(0.2), keyBody(0.3)),
+        makeClient: () => client,
+        driver: fakeDriver(), script: SCRIPT, rules: RULES, screen: SCREEN,
+    });
+    assert.equal(result.reports.length, 0);
+    assert.equal(client.calls.verdict, 0);
+});
+
+test('confirmReport via runPaid recebe a imagem do shot do report, não a última captura', async () => {
+    const report = call('r', 'report', { title: 'achado na captura 2', rule: 1, shot: 2, seen: 'texto', expected: 'esperado' });
+    const violated = call('v', 'check', { rule: 1, shot: 2, seen: 'texto', verdict: 'violated' });
+    const base = fakeClient([
+        reply([call('s2', 'screenshot', {})]),
+        reply([call('s3', 'screenshot', {})]),
+        reply([violated, report, ...ALL_OK.slice(1), call('d', 'done', { summary: 'ok' })]),
+    ]);
+    const verdicts = [];
+    const client = {
+        calls: base.calls,
+        complete: async (request) => {
+            if (request.tools[0].function.name === 'verdict') verdicts.push(JSON.stringify(request));
+            return base.complete(request);
+        },
+    };
+    const result = await runPaid({
+        fetchKey: fakeFetchKey(keyBody(0.2), keyBody(0.3)),
+        makeClient: () => client,
+        driver: fakeDriver(['IMG-A', 'IMG-B', 'IMG-C']), script: SCRIPT, rules: RULES, screen: SCREEN,
+    });
+    assert.equal(result.reports[0].screenshot, 'IMG-B');
+    assert.equal(verdicts.length, 1);
+    assert.ok(verdicts[0].includes('IMG-B'));
+    assert.equal(verdicts[0].includes('IMG-C'), false);
+});
+
+test('laço e confirmações juntos não passam de maxScriptUsd: confirmação com orçamento esgotado vira script-budget', async () => {
+    const report = call('r', 'report', { title: 'achado caro', rule: 1, shot: 1, seen: 'texto', expected: 'esperado' });
+    const violated = call('v', 'check', { rule: 1, shot: 1, seen: 'texto', verdict: 'violated' });
+    const client = fakeClient([reply([violated, report, ...ALL_OK.slice(1), call('d', 'done', { summary: 'ok' })], 0.09)]);
+    const result = await runPaid({
+        fetchKey: fakeFetchKey(keyBody(0.2), keyBody(0.3)),
+        makeClient: () => client,
+        driver: fakeDriver(), script: SCRIPT, rules: RULES, screen: SCREEN,
+    });
+    assert.equal(result.reports[0].confirmed, null);
+    assert.equal(result.reports[0].why, 'script-budget');
+    assert.equal(client.calls.verdict, 0);
+    assert.ok(result.costUsd <= 0.1 + 1e-9);
 });

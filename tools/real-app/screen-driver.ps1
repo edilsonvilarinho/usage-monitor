@@ -6,7 +6,7 @@
   Runs only on GitHub Actions. It prepares the same black desktop as record.ps1, starts the app, waits for
   its HUD, writes the ready line and then answers one request per stdin line until EOF.
   stdout carries only protocol JSON; diagnostics go to stderr. Requests: screenshot, click, move, drag,
-  type, key, wait. Coordinates are capture pixels, 0-based on the virtual screen.
+  type, key, wait, zoom. Coordinates are capture pixels, 0-based on the virtual screen.
 .PARAMETER Exe
   Path to 'Usage Monitor.exe' (installed or built).
 .PARAMETER DataDir
@@ -43,6 +43,7 @@ Add-Type -ReferencedAssemblies $references -TypeDefinition @'
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -164,7 +165,12 @@ public static class ScreenDriverNative {
 
     // JPEG bytes at the given quality (GDI+ default is 75; the protocol asks for about 85).
     public static byte[] EncodeJpeg(byte[] pixels, int width, int height, int stride, long quality) {
-        using (Bitmap bmp = ToBitmap(pixels, width, height, stride))
+        using (Bitmap bmp = ToBitmap(pixels, width, height, stride)) {
+            return EncodeBitmapJpeg(bmp, quality);
+        }
+    }
+
+    public static byte[] EncodeBitmapJpeg(Bitmap bmp, long quality) {
         using (MemoryStream ms = new MemoryStream()) {
             ImageCodecInfo codec = null;
             foreach (ImageCodecInfo candidate in ImageCodecInfo.GetImageEncoders()) {
@@ -175,6 +181,25 @@ public static class ScreenDriverNative {
                 bmp.Save(ms, codec, parameters);
             }
             return ms.ToArray();
+        }
+    }
+
+    // Captures the area x,y,w,h (virtual-screen origin originX,originY) and enlarges it by the largest whole factor
+    // that keeps the result within 1024x768 (at least 1). The enlargement uses high-quality bicubic interpolation.
+    public static byte[] ZoomJpeg(int originX, int originY, int x, int y, int w, int h, long quality) {
+        int factor = Math.Max(1, Math.Min(1024 / w, 768 / h));
+        using (Bitmap source = new Bitmap(w, h, PixelFormat.Format32bppArgb)) {
+            using (Graphics sourceGraphics = Graphics.FromImage(source)) {
+                sourceGraphics.CopyFromScreen(originX + x, originY + y, 0, 0, new Size(w, h), CopyPixelOperation.SourceCopy);
+            }
+            using (Bitmap zoomed = new Bitmap(w * factor, h * factor, PixelFormat.Format32bppArgb)) {
+                using (Graphics g = Graphics.FromImage(zoomed)) {
+                    g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                    g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    g.DrawImage(source, new Rectangle(0, 0, w * factor, h * factor), new Rectangle(0, 0, w, h), GraphicsUnit.Pixel);
+                }
+                return EncodeBitmapJpeg(zoomed, quality);
+            }
         }
     }
 }
@@ -365,6 +390,21 @@ function Invoke-Tool($request) {
             $spec = $KEYS[$name]
             if (-not [ScreenDriverNative]::VirtualKey([uint16]$spec[0], [bool]$spec[1], $false)) { throw 'SendInput key failed' }
             if (-not [ScreenDriverNative]::VirtualKey([uint16]$spec[0], [bool]$spec[1], $true)) { throw 'SendInput key failed' }
+        }
+        'zoom' {
+            # Area of at least 16x16 px, wholly inside the screen; otherwise the request fails with ok:false.
+            $zoomX = Get-IntField $request 'x'
+            $zoomY = Get-IntField $request 'y'
+            $zoomW = Get-IntField $request 'w'
+            $zoomH = Get-IntField $request 'h'
+            if ($zoomW -lt 16 -or $zoomH -lt 16) { throw "zoom area smaller than 16 px: ${zoomW}x${zoomH}" }
+            if ($zoomX -lt 0 -or $zoomY -lt 0 -or ($zoomX + $zoomW) -gt $script:vs.Width -or ($zoomY + $zoomH) -gt $script:vs.Height) {
+                throw "zoom area outside the screen: $zoomX,$zoomY ${zoomW}x${zoomH}"
+            }
+            $jpeg = [ScreenDriverNative]::ZoomJpeg($script:vs.X, $script:vs.Y, $zoomX, $zoomY, $zoomW, $zoomH, 90)
+            $script:shotIndex++
+            [System.IO.File]::WriteAllBytes((Join-Path $shotsDir ('{0:D3}.jpg' -f $script:shotIndex)), $jpeg)
+            return @{ image = [Convert]::ToBase64String($jpeg) }
         }
         'wait' {
             $ms = Get-IntField $request 'ms'

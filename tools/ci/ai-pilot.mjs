@@ -5,9 +5,9 @@ export const LIMITS = Object.freeze({
     maxSteps: 60,
     maxPromptTokens: 100000,
     promptMargin: 4000,
-    maxScriptUsd: 0.3,
+    maxScriptUsd: 0.1,
     maxPilotUsd: 5,
-    reserveUsd: 0.05,
+    reserveUsd: 0.02,
     maxOutputTokens: 1024,
     maxWaitMs: 5000,
     maxTypeChars: 200,
@@ -15,6 +15,11 @@ export const LIMITS = Object.freeze({
 
 // Tolerância para soma de decimais em dólar: exatamente no limite continua permitido.
 const EPSILON = 1e-9
+// Regras do produto numeradas de 1 a 9 (pilot-rules.md).
+const RULE_COUNT = 9
+// Recusas de done antes de aceitar o roteiro incompleto.
+const MAX_DONE_REFUSALS = 5
+const VERDICTS = ['ok', 'violated', 'not_seen']
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions'
 
@@ -25,6 +30,7 @@ const KEYS = ['Escape', 'Enter', 'Tab', 'Space', 'Up', 'Down', 'Left', 'Right', 
 
 const INT = { type: 'integer' }
 const TEXT = { type: 'string' }
+const RULE = { type: 'integer', minimum: 1, maximum: RULE_COUNT }
 
 // Schema de ferramenta no formato de function calling da OpenAI.
 function tool(name, description, properties = {}, required = []) {
@@ -32,14 +38,17 @@ function tool(name, description, properties = {}, required = []) {
 }
 
 export const TOOLS = [
-    tool('screenshot', 'Captura a tela atual.'),
+    tool('screenshot', 'Captura a tela atual; a captura ganha o próximo número.'),
+    tool('zoom', 'Amplia um retângulo (x, y, w, h inteiros) para ler texto pequeno; vira captura numerada.', { x: INT, y: INT, w: INT, h: INT }, ['x', 'y', 'w', 'h']),
     tool('click', 'Clique esquerdo na coordenada (0-based).', { x: INT, y: INT }, ['x', 'y']),
     tool('drag', 'Arrasta da origem ao destino.', { x1: INT, y1: INT, x2: INT, y2: INT }, ['x1', 'y1', 'x2', 'y2']),
     tool('move', 'Move o ponteiro (0-based).', { x: INT, y: INT }, ['x', 'y']),
     tool('type', 'Digita texto.', { text: TEXT }, ['text']),
     tool('key', 'Pressiona uma tecla da lista permitida.', { name: { type: 'string', enum: KEYS } }, ['name']),
     tool('wait', 'Espera em milissegundos.', { ms: INT }, ['ms']),
-    tool('report', 'Registra um achado: título, regra violada e onde.', { title: TEXT, rule: TEXT, where: TEXT }, ['title', 'rule', 'where']),
+    tool('check', 'Veredito de uma regra. seen é o texto literal da captura; not_seen dispensa shot.', { rule: RULE, shot: INT, seen: TEXT, verdict: { type: 'string', enum: VERDICTS } }, ['rule', 'seen', 'verdict']),
+    tool('cover', 'Marca um item de cobertura. possible false marca impossível e dispensa shot.', { item: TEXT, shot: INT, seen: TEXT, possible: { type: 'boolean' } }, ['item', 'seen']),
+    tool('report', 'Registra um achado de regra com check violated.', { title: TEXT, rule: RULE, shot: INT, seen: TEXT, expected: TEXT }, ['title', 'rule', 'shot', 'seen', 'expected']),
     tool('done', 'Encerra o roteiro com um resumo.', { summary: TEXT }, ['summary']),
 ]
 
@@ -100,8 +109,13 @@ export function createBudget({ pilotSpentUsd = 0 } = {}) {
             budget.lastPromptTokens = usage.prompt_tokens
             budget.lastCompletionTokens = usage.completion_tokens
         },
+        // Início de roteiro: zera o custo do roteiro e o tamanho do prompt.
         startScript() {
             budget.scriptUsd = 0
+            budget.startConversation()
+        },
+        // Nova conversa (confirmação): zera só o tamanho do prompt; o custo continua no roteiro.
+        startConversation() {
             budget.lastPromptTokens = 0
             budget.lastCompletionTokens = 0
         },
@@ -120,12 +134,25 @@ function textOf(value) {
     return typeof value === 'string' ? value.trim() : ''
 }
 
+const isRule = (value) => Number.isInteger(value) && value >= 1 && value <= RULE_COUNT
+const isShot = (value) => Number.isInteger(value) && value >= 1
+
+// Retângulo inteiro dentro da tela, com lados de 16 px até metade da tela.
+function zoomArea({ x, y, w, h }, screen) {
+    if (![x, y, w, h].every(Number.isInteger)) return false
+    if (w < 16 || h < 16 || w > screen.width / 2 || h > screen.height / 2) return false
+    return x >= 0 && y >= 0 && x + w <= screen.width && y + h <= screen.height
+}
+
 // Valida a ação vinda do modelo. Campos extras são descartados; o driver só recebe o que passou aqui.
 export function validateAction(name, args, screen) {
     const input = args && typeof args === 'object' ? args : {}
     switch (name) {
         case 'screenshot':
             return ok({ tool: 'screenshot' })
+        case 'zoom':
+            if (!zoomArea(input, screen)) return bad('campo inválido em zoom: x, y, w e h inteiros; retângulo dentro da tela; 16 <= w,h <= metade da tela')
+            return ok({ tool: 'zoom', x: input.x, y: input.y, w: input.w, h: input.h })
         case 'click':
         case 'move':
             if (!inScreen(input.x, input.y, screen)) return bad(`campo inválido em ${name}: x e y inteiros dentro da tela`)
@@ -148,12 +175,30 @@ export function validateAction(name, args, screen) {
         case 'key':
             if (!KEYS.includes(input.name)) return bad(`tecla fora da lista permitida: ${String(input.name)}`)
             return ok({ tool: 'key', name: input.name })
+        case 'check': {
+            const seen = textOf(input.seen)
+            if (!isRule(input.rule) || !VERDICTS.includes(input.verdict) || !seen) {
+                return bad('campo inválido em check: rule de 1 a 9, verdict ok|violated|not_seen, seen não vazio')
+            }
+            if (input.verdict !== 'not_seen' && !isShot(input.shot)) return bad('check exige shot (número da captura) fora de not_seen')
+            return ok({ tool: 'check', rule: input.rule, shot: isShot(input.shot) ? input.shot : undefined, seen, verdict: input.verdict })
+        }
+        case 'cover': {
+            const item = textOf(input.item)
+            const seen = textOf(input.seen)
+            if (!item || !seen) return bad('campo inválido em cover: item e seen não vazios')
+            if (input.possible === false) return ok({ tool: 'cover', item, seen, possible: false })
+            if (!isShot(input.shot)) return bad('cover exige shot (número da captura) ou possible false')
+            return ok({ tool: 'cover', item, shot: input.shot, seen })
+        }
         case 'report': {
             const title = textOf(input.title)
-            const rule = textOf(input.rule)
-            const where = textOf(input.where)
-            if (!title || !rule || !where) return bad('campo inválido em report: title, rule e where não vazios')
-            return ok({ tool: 'report', title, rule, where })
+            const seen = textOf(input.seen)
+            const expected = textOf(input.expected)
+            if (!title || !seen || !expected || !isRule(input.rule) || !isShot(input.shot)) {
+                return bad('campo inválido em report: title, seen e expected não vazios; rule de 1 a 9; shot número da captura')
+            }
+            return ok({ tool: 'report', title, rule: input.rule, shot: input.shot, seen, expected })
         }
         case 'done': {
             const summary = textOf(input.summary)
@@ -187,72 +232,164 @@ function parseArguments(toolCall) {
     }
 }
 
+// Pendências para aceitar done: check de cada regra, cover de cada item, report das regras violadas.
+function missingOf(state) {
+    const missing = []
+    for (let rule = 1; rule <= RULE_COUNT; rule += 1) {
+        const check = state.checks.get(rule)
+        if (!check) missing.push(`check da regra ${rule}`)
+        else if (check.verdict === 'violated' && !state.reportedRules.has(rule)) missing.push(`report da regra ${rule} (violated)`)
+    }
+    for (const item of state.coverageItems) {
+        if (!state.covers.has(item)) missing.push(`cover de ${item}`)
+    }
+    return missing
+}
+
 function finish(stop, state, budget, detail) {
-    const result = { stop, steps: state.steps, costUsd: budget.scriptUsd, reports: state.reports }
+    const result = {
+        stop,
+        steps: state.steps,
+        costUsd: budget.scriptUsd,
+        reports: state.reports,
+        checks: [...state.checks.values()].sort((a, b) => a.rule - b.rule),
+        coverage: state.coverageItems.filter((item) => state.covers.has(item)).map((item) => state.covers.get(item)),
+        missing: missingOf(state),
+    }
     if (detail !== undefined) result.detail = detail
     return result
 }
 
-// Relatório repetido (título + regra + onde) fica uma vez só.
-function recordReport(state, action) {
-    const key = [action.title, action.rule, action.where].join('\u0000')
-    if (state.seen.has(key)) return
-    state.seen.add(key)
-    state.reports.push({
-        step: state.steps,
-        title: action.title,
-        rule: action.rule,
-        where: action.where,
-        screenshot: state.lastImage,
-    })
+// Guarda a captura com número novo; a primeira, antes do laço, é a 1.
+function recordCapture(state, image) {
+    state.nextShot += 1
+    state.images.set(state.nextShot, image)
+    return state.nextShot
 }
 
-// Executa um turno do modelo. Devolve { stop } quando o roteiro acaba no meio do turno; senão { done, images }.
+// Resultado da ferramenta de captura: o texto leva o número que o modelo usa em check, cover e report.
+function captureResult(state, image) {
+    const shot = recordCapture(state, image)
+    return { text: `captura ${shot}`, shot }
+}
+
+function recordCheck(state, action) {
+    if (action.shot !== undefined && !state.images.has(action.shot)) return { text: `erro: captura ${action.shot} não existe` }
+    state.checks.set(action.rule, { rule: action.rule, verdict: action.verdict, seen: action.seen, shot: action.shot })
+    return { text: 'ok' }
+}
+
+function recordCover(state, action) {
+    if (!state.coverageItems.includes(action.item)) return { text: `erro: item fora da cobertura: ${action.item}` }
+    if (action.possible === false) {
+        state.covers.set(action.item, { item: action.item, possible: false, seen: action.seen })
+        return { text: 'ok' }
+    }
+    if (!state.images.has(action.shot)) return { text: `erro: captura ${action.shot} não existe` }
+    state.covers.set(action.item, { item: action.item, shot: action.shot, seen: action.seen })
+    return { text: 'ok' }
+}
+
+// Achado só vale com check violated da mesma regra; duplicata = mesma regra + mesmo título.
+function recordReport(state, action) {
+    if (state.checks.get(action.rule)?.verdict !== 'violated') return { text: `erro: report da regra ${action.rule} sem check violated` }
+    if (!state.images.has(action.shot)) return { text: `erro: captura ${action.shot} não existe` }
+    const key = [action.rule, action.title].join('\u0000')
+    if (!state.reportKeys.has(key)) {
+        state.reportKeys.add(key)
+        state.reports.push({
+            step: state.steps,
+            title: action.title,
+            rule: action.rule,
+            shotNumber: action.shot,
+            seen: action.seen,
+            expected: action.expected,
+            screenshot: state.images.get(action.shot),
+        })
+    }
+    state.reportedRules.add(action.rule)
+    return { text: 'ok' }
+}
+
+// Executa uma ação validada. Devolve o texto da resposta e, se for captura, o número dela.
+async function executeTool(action, state, driver) {
+    switch (action.tool) {
+        case 'screenshot':
+            return captureResult(state, await driver.screenshot())
+        case 'zoom':
+            return captureResult(state, await driver.zoom(action))
+        case 'check':
+            return recordCheck(state, action)
+        case 'cover':
+            return recordCover(state, action)
+        case 'report':
+            return recordReport(state, action)
+        default:
+            await driver.perform(action)
+            return { text: 'ok' }
+    }
+}
+
+// Executa um turno do modelo. done recusado não executa o resto do turno.
 async function runTurn({ toolCalls, messages, state, driver, screen }) {
     const images = []
-    for (const toolCall of toolCalls) {
+    for (let index = 0; index < toolCalls.length; index += 1) {
+        const toolCall = toolCalls[index]
         const parsed = parseArguments(toolCall)
-        const checked = parsed.ok
-            ? validateAction(toolCall?.function?.name, parsed.args, screen)
-            : bad(parsed.error)
+        const checked = parsed.ok ? validateAction(toolCall?.function?.name, parsed.args, screen) : bad(parsed.error)
         if (!checked.ok) {
             messages.push(toolMessage(toolCall.id, `erro: ${checked.error}`))
             continue
         }
-        const action = checked.action
-        if (action.tool === 'done') {
-            messages.push(toolMessage(toolCall.id, 'ok'))
-            return { done: true, images }
+        if (checked.action.tool === 'done') {
+            const turn = finishRequest(state, checked.action)
+            messages.push(toolMessage(toolCall.id, turn.text))
+            if (turn.done) return { done: true, stop: turn.stop, images }
+            for (const rest of toolCalls.slice(index + 1)) messages.push(toolMessage(rest.id, 'ignorado: done recusado'))
+            return { done: false, images }
         }
-        if (action.tool === 'report') {
-            recordReport(state, action)
-            messages.push(toolMessage(toolCall.id, 'ok'))
-            continue
+        const result = await executeTool(checked.action, state, driver)
+        messages.push(toolMessage(toolCall.id, result.text))
+        if (result.shot !== undefined) {
+            images.push({ role: 'user', content: [{ type: 'text', text: `captura ${result.shot}` }, imagePart(state.images.get(result.shot))] })
         }
-        if (action.tool === 'screenshot') {
-            state.lastImage = await driver.screenshot()
-            messages.push(toolMessage(toolCall.id, 'captured'))
-            images.push({ role: 'user', content: [{ type: 'text', text: 'captura solicitada' }, imagePart(state.lastImage)] })
-            continue
-        }
-        await driver.perform(action)
-        messages.push(toolMessage(toolCall.id, 'ok'))
     }
     return { done: false, images }
 }
 
+// done aceito com pendências só depois de MAX_DONE_REFUSALS recusas; aí o stop vira done-incomplete.
+function finishRequest(state, action) {
+    const missing = missingOf(state)
+    if (missing.length === 0) return { done: true, stop: 'done', text: 'ok' }
+    if (state.doneRefusals >= MAX_DONE_REFUSALS) return { done: true, stop: 'done-incomplete', text: 'ok' }
+    state.doneRefusals += 1
+    return { done: false, text: `erro: done recusado (${action.summary.length} caracteres). Falta: ${missing.join('; ')}` }
+}
+
 // Roteiro completo. Erro nunca rejeita: vira stop + detail.
-export async function runScript({ client, driver, script, rules, screen, budget }) {
+export async function runScript({ client, driver, script, rules, screen, budget, coverage = [] }) {
     budget.startScript()
-    const state = { steps: 0, reports: [], seen: new Set(), lastImage: null }
+    const state = {
+        steps: 0,
+        reports: [],
+        reportKeys: new Set(),
+        images: new Map(),
+        nextShot: 0,
+        checks: new Map(),
+        covers: new Map(),
+        reportedRules: new Set(),
+        coverageItems: [...coverage],
+        doneRefusals: 0,
+    }
+    let first
     try {
-        state.lastImage = await driver.screenshot()
+        first = recordCapture(state, await driver.screenshot())
     } catch (error) {
         return finish('driver-error', state, budget, messageOf(error))
     }
     const messages = [
         { role: 'system', content: rules },
-        { role: 'user', content: [{ type: 'text', text: script }, imagePart(state.lastImage)] },
+        { role: 'user', content: [{ type: 'text', text: script }, imagePart(state.images.get(first))] },
     ]
     while (true) {
         if (state.steps >= LIMITS.maxSteps) return finish('max-steps', state, budget)
@@ -274,12 +411,19 @@ export async function runScript({ client, driver, script, rules, screen, budget 
         messages.push({ role: 'assistant', content: message.content ?? null, tool_calls: toolCalls })
         try {
             const turn = await runTurn({ toolCalls, messages, state, driver, screen })
-            if (turn.done) return finish('done', state, budget)
+            if (turn.done) return finish(turn.stop, state, budget)
             messages.push(...turn.images)
         } catch (error) {
             return finish('driver-error', state, budget, messageOf(error))
         }
     }
+}
+
+// Texto da regra pelo número, como está em pilot-rules.md; sem linha, cai para o número.
+function ruleText(rules, rule) {
+    const prefix = `${rule}. `
+    const line = String(rules).split('\n').find((item) => item.startsWith(prefix))
+    return line ? line.slice(prefix.length) : `regra ${rule}`
 }
 
 // Veredito de um relatório com o modelo do piloto. null significa "não medido", nunca falso.
@@ -291,7 +435,7 @@ export async function confirmReport({ client, report, rules, budget }) {
         {
             role: 'user',
             content: [
-                { type: 'text', text: `título: ${report.title}\nregra: ${report.rule}\nonde: ${report.where}` },
+                { type: 'text', text: `regra ${report.rule}: ${ruleText(rules, report.rule)}\ntítulo: ${report.title}\no que foi lido na captura: ${report.seen}` },
                 imagePart(report.screenshot),
             ],
         },

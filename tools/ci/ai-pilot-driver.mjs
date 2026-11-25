@@ -140,5 +140,11 @@ export function createScreenDriver({ child, timeoutMs = 30000 }) {
         })
     }
 
-    return { ready, screenshot, perform, close }
+    async function zoom({ x, y, w, h }) {
+        const msg = await request({ tool: 'zoom', x, y, w, h });
+        if (typeof msg.image !== 'string' || msg.image.length === 0) throw new Error('resposta de zoom sem imagem')
+        return msg.image
+    }
+
+    return { ready, screenshot, perform, close, zoom }
 }

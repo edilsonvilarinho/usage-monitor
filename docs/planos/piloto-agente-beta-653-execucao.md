@@ -48,6 +48,21 @@ confirma só as suspeitas; nada abre issue sozinho.
   (quem chama faz `startScript()` antes); `null` é "não medido". Resposta HTTP 200 sem JSON pode ter custado e não ser somada: a
   conferência de `/api/v1/key` antes de cada roteiro cobre.
 
+## A04b — método, depois do ensaio pago (dono: "sim pode seguir", 2026-11-25)
+
+O ensaio (run 45645696949, US$ 0,0108) não achou o #474 com o texto na tela, encerrou em 7 passos e usou `report` sem violação. Correções:
+
+1. **Regra por regra:** `check` por regra, com o texto literal lido e o número da captura; `done` recusado enquanto faltar.
+2. **Cobertura:** `cover` por item (contas, engrenagem, outros botões, minimizar, restaurar, ponteiro longe); `done` recusado enquanto faltar.
+3. **Prova:** `report` exige número de regra, captura existente, o que leu e o que a regra pede; a confirmação recebe **essa** captura.
+4. **Leitura:** `zoom` numa área da tela.
+5. **Teto determinístico:** US$ 0,10 por job, confirmações incluídas, e o `plan` recusa se gasto registrado (`pilot-ledger.json`) + jobs × 0,10 passar de
+   US$ 5. Não depende do `usage` da chave, que ficou em 0 por minutos depois do gasto (causa não confirmada).
+6. **Regra 4** diz o que é data (dia e mês). As outras regras não mudam.
+
+**Medida que vale, escrita antes:** #474 fica fora (já foi visto e a regra dele mudou). Valem `gear-balloon`, `balloon-stays` e `thin-bar`, 3 tentativas por lado: 18 jobs,
+no máximo US$ 1,80. Só achado **confirmado** conta. Critério do plano: 70% de acerto e até 20% de alarme falso. Abaixo disso, o piloto termina.
+
 ## Mapa dos casos (A01)
 
 Versões medidas por `git tag --contains` do merge da correção; a ruim é a tag imediatamente anterior, com `.exe` publicado.
@@ -85,6 +100,8 @@ na versão boa é conferido à mão antes de contar como falso.
 | A03b | `Parser::ParseFile` nos dois; C# do `Add-Type` compilado sem rodar; `seed.ps1` local nos 4 cenários novos e em `floating-idle` e `docked-top-hole-idle` | sem harness para PowerShell: 0 erros; sementes antigas idênticas às da `main`; chaves de registro de teste removidas. Devolvida 1× (campos `fromX`/`key` fora do contrato de `validateAction`; recolher automático ligado); `PageUp`/`PageDown` corrigidos na conferência. **Falta** rodar no runner (A03c, `dry`) |
 | A03c (código) | `node --test "tools/ci/test/*.test.mjs"`; `yaml.safe_load`; `Parser::ParseFile` dos passos pwsh | vermelho: 5 novos (`actual: [], expected: [ { turn: 1, text: …`; `actual: {}, expected: { stop: …`; `actual: 0, expected: 2`) e os 14 originais contra a cópia com stub (4 de 19 passam); verde 19/19, 273/273 na pasta. Devolvida 1× (pago em qualquer branch e em paralelo; sem transcrição; sem vermelho). Pago só por `workflow_dispatch` na `main`, um por vez; o segredo não chega ao pwsh que controla a tela |
 | A03c (prova sem IA) | runs 45640121840, 45640638315, 45641283271, 45641901198, 45642448046 e [45642977227](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45642977227) (branch descartável, 8/8 jobs verdes em cada); `node --test "tools/ci/test/*.test.mjs"` | **os 4 casos vistos na tela**, capturas abertas uma a uma: #474 ruim "Reinicia Sáb 12h03" × boa "28/11 12h03"; #596 ruim 80 px, 7 contas sem recolher e engrenagem fora da tela × boa 95 px com 4 minimizadas; #623 ruim não abre o balão da engrenagem (fica o da conta ou nenhum) × boa abre ao lado dela; #631 ruim mantém o balão aberto depois de minimizar × boa fecha. A 1ª rodada mostrou 2 dos 4 casos **inválidos** (fontes com chave somem sem chave): semente com chave falsa. Um erro de leitura de coordenada meu fez o clique errar o botão em 3 rodadas. Ponteiro anda em passos. Vermelho `gear-balloon + move - screenshot` e regra 5; verde 273/273 |
+| A04 (ensaio) | run [45645696949](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45645696949), `main` `b6f694f2`, `reset-date`, 1 por lado | US$ 0,0054 por roteiro. Ruim: 7 passos, 0 achado do caso ("Sáb 12h30" na captura, lido como data). Boa: 6 passos, 2 `report` sem violação. 3 de 3 confirmações rejeitadas. A confirmação recebia só a última captura: defeito do piloto. `usage` da chave 0 antes e depois |
+| A04b | `node --test "tools/ci/test/*.test.mjs"`; script do `plan` extraído do YAML e executado; `Parser::ParseFile` do driver | vermelho: `actual: 0.3, expected: 0.1`; `- captura 2`; `actual: 1, expected: 6`; driver `actual: [], expected: [{ id: 1, tool: 'zoom' …`; contra cópia com stub, `10 !== 0` (custo zerado na confirmação) e `worstCaseUsd`; contra cópias mutadas, `expected: IMG-B, actual: IMG-C` (captura errada na confirmação) e `true !== null` (confirmação acima do teto). Verde 289/289, execução independente; 24 testes do contrato antigo atualizados com igualdade mantida (diff lido). Devolvida 1× (`plan` tratava `coverage` como caso; relatório sem lido/pedido). `plan`: PR = `dry`, 4 casos; pago = 18 jobs, pior caso US$ 1,8108 de 5. `zoom` sem harness: vai no probe do `dry` |
 
 ## Problemas em aberto e riscos
 

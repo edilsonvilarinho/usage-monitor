@@ -28,8 +28,10 @@ on:
       - 'tools/ci/ai-pilot.mjs'
       - 'tools/ci/ai-pilot-driver.mjs'
       - 'tools/ci/test/ai-pilot-run.test.mjs'
+      - 'tools/ci/test/ai-pilot-method.test.mjs'
       - 'tools/real-app/pilot-cases.json'
       - 'tools/real-app/pilot-rules.md'
+      - 'tools/real-app/pilot-ledger.json'
       - 'tools/real-app/seed.ps1'
       - 'tools/real-app/screen-driver.ps1'
       - '.github/workflows/ai-pilot.yml'
@@ -62,6 +64,7 @@ jobs:
         run: |
           node <<'JS'
           const fs = require('node:fs')
+          const { spawnSync } = require('node:child_process')
           const fail = (message) => { console.error(message); process.exit(1) }
           const pullRequest = process.env.EVENT === 'pull_request'
           const mode = pullRequest ? 'dry' : process.env.MODE_IN
@@ -69,13 +72,20 @@ jobs:
           if (mode === 'paid' && (process.env.EVENT !== 'workflow_dispatch' || process.env.REF !== 'refs/heads/main')) {
             fail('paid só roda por workflow_dispatch em refs/heads/main')
           }
-          const known = Object.keys(JSON.parse(fs.readFileSync('tools/real-app/pilot-cases.json', 'utf8'))).filter((id) => id !== 'script')
+          const NON_CASE_KEYS = ['script', 'coverage', 'coverageLabels']
+          const known = Object.keys(JSON.parse(fs.readFileSync('tools/real-app/pilot-cases.json', 'utf8'))).filter((id) => !NON_CASE_KEYS.includes(id))
           const raw = pullRequest ? 'all' : (process.env.CASES_IN || 'all').trim()
           const picked = raw === 'all' ? known : [...new Set(raw.split(',').map((id) => id.trim()))]
           for (const id of picked) if (!known.includes(id)) fail(`caso desconhecido: ${id}`)
           const attempts = pullRequest ? 1 : Number(process.env.ATTEMPTS_IN)
           if (!Number.isInteger(attempts) || attempts < 1 || attempts > 3) fail('attempts deve ser inteiro de 1 a 3')
           const matrix = { case: picked, side: ['bad', 'good'], attempt: Array.from({ length: attempts }, (_, index) => index + 1) }
+          // Orçamento pago: pior caso (ledger + jobs x teto do roteiro) antes de publicar a matriz.
+          if (mode === 'paid') {
+            const jobs = picked.length * matrix.side.length * attempts
+            const check = spawnSync(process.execPath, ['tools/ci/ai-pilot-run.mjs', '--plan-budget', '--jobs', String(jobs)], { stdio: 'inherit' })
+            if (check.status !== 0) fail(`orçamento pago não cabe: ${jobs} jobs`)
+          }
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `mode=${mode}\nmatrix=${JSON.stringify(matrix)}\n`)
           JS
 

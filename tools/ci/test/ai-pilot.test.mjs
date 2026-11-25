@@ -24,6 +24,10 @@ const reply = (toolCalls, usage = DEFAULT_USAGE, content = null) => ({ message: 
 const call = (id, name, args) => ({ id, type: 'function', function: { name, arguments: JSON.stringify(args) } });
 const rawCall = (id, name, raw) => ({ id, type: 'function', function: { name, arguments: raw } });
 const roles = (messages) => messages.map((message) => message.role);
+// Checks das nove regras ok na captura 1: libera done sem pendência.
+const CHECKS_OK = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((rule) => call(`k${rule}`, 'check', { rule, shot: 1, seen: 'texto', verdict: 'ok' }));
+// Check violated da regra 1: pré-requisito de report.
+const VIOLATED = call('v', 'check', { rule: 1, shot: 1, seen: 'texto', verdict: 'violated' });
 
 // Cliente falso: grava uma cópia de cada requisicao e responde com a lista na ordem (repete a ultima).
 function fakeClient(replies) {
@@ -74,7 +78,7 @@ function fakeFetch(response) {
 // --- checkKey ---
 
 test('checkKey: limite 5 e saldo igual ao piso passam e devolvem o uso', () => {
-    assert.deepEqual(checkKey({ data: { limit: 5, limit_remaining: 0.3, usage: 0.5 } }), { ok: true, usage: 0.5 });
+    assert.deepEqual(checkKey({ data: { limit: 5, limit_remaining: 0.1, usage: 0.5 } }), { ok: true, usage: 0.5 });
 });
 
 test('checkKey: sem data ou corpo nulo e invalid-response', () => {
@@ -102,7 +106,7 @@ test('checkKey: limit acima de 5 passa, sem teto de limite', () => {
 });
 
 test('checkKey: saldo abaixo do piso e remaining-too-low', () => {
-    assert.deepEqual(checkKey({ data: { limit: 5, limit_remaining: 0.29, usage: 0 } }), { ok: false, reason: 'remaining-too-low' });
+    assert.deepEqual(checkKey({ data: { limit: 5, limit_remaining: 0.09, usage: 0 } }), { ok: false, reason: 'remaining-too-low' });
 });
 
 test('checkKey: remaining nao finito e invalid-response mesmo com limite acima de 5', () => {
@@ -116,11 +120,11 @@ test('checkKey: usage ausente, negativo, string ou nao finito e invalid-response
 });
 
 test('checkKey: uso acima do teto do piloto com a reserva e pilot-budget', () => {
-    assert.deepEqual(checkKey({ data: { limit: 5, limit_remaining: 1, usage: 4.96 } }), { ok: false, reason: 'pilot-budget' });
+    assert.deepEqual(checkKey({ data: { limit: 5, limit_remaining: 1, usage: 4.99 } }), { ok: false, reason: 'pilot-budget' });
 });
 
 test('checkKey: uso mais reserva exatamente no teto do piloto passa', () => {
-    assert.deepEqual(checkKey({ data: { limit: null, usage: 4.95 } }), { ok: true, usage: 4.95 });
+    assert.deepEqual(checkKey({ data: { limit: null, usage: 4.98 } }), { ok: true, usage: 4.98 });
 });
 
 // --- createBudget ---
@@ -131,7 +135,7 @@ test('createBudget: orcamento novo permite chamada', () => {
 
 test('createBudget: script exatamente no teto e permitido', () => {
     const budget = createBudget();
-    budget.charge({ cost: 0.25, prompt_tokens: 0, completion_tokens: 0 });
+    budget.charge({ cost: 0.08, prompt_tokens: 0, completion_tokens: 0 });
     assert.equal(budget.canCall(), null);
 });
 
@@ -142,11 +146,11 @@ test('createBudget: script acima do teto e script-budget', () => {
 });
 
 test('createBudget: piloto exatamente no teto e permitido', () => {
-    assert.equal(createBudget({ pilotSpentUsd: 4.95 }).canCall(), null);
+    assert.equal(createBudget({ pilotSpentUsd: 4.98 }).canCall(), null);
 });
 
 test('createBudget: piloto acima do teto e pilot-budget', () => {
-    assert.equal(createBudget({ pilotSpentUsd: 4.96 }).canCall(), 'pilot-budget');
+    assert.equal(createBudget({ pilotSpentUsd: 4.99 }).canCall(), 'pilot-budget');
 });
 
 test('createBudget: prompt + completion + margem exatamente no teto e permitido', () => {
@@ -203,16 +207,16 @@ test('createBudget: startScript zera o script e mantem o piloto', () => {
 
 // --- TOOLS ---
 
-test('TOOLS: lista as nove ferramentas do briefing como schemas de funcao', () => {
+test('TOOLS: lista as doze ferramentas do método como schemas de funcao', () => {
     const names = TOOLS.map((tool) => tool.function.name);
-    assert.deepEqual(names, ['screenshot', 'click', 'drag', 'move', 'type', 'key', 'wait', 'report', 'done']);
+    assert.deepEqual(names, ['screenshot', 'zoom', 'click', 'drag', 'move', 'type', 'key', 'wait', 'check', 'cover', 'report', 'done']);
     assert.ok(TOOLS.every((tool) => tool.type === 'function'));
 });
 
 test('LIMITS: valores do briefing, congelados', () => {
     assert.deepEqual({ ...LIMITS }, {
-        maxSteps: 60, maxPromptTokens: 100000, promptMargin: 4000, maxScriptUsd: 0.3, maxPilotUsd: 5,
-        reserveUsd: 0.05, maxOutputTokens: 1024, maxWaitMs: 5000, maxTypeChars: 200,
+        maxSteps: 60, maxPromptTokens: 100000, promptMargin: 4000, maxScriptUsd: 0.1, maxPilotUsd: 5,
+        reserveUsd: 0.02, maxOutputTokens: 1024, maxWaitMs: 5000, maxTypeChars: 200,
     });
     assert.equal(Object.isFrozen(LIMITS), true);
 });
@@ -279,8 +283,8 @@ test('validateAction descarta campos extras da acao', () => {
         { ok: true, action: { tool: 'click', x: 1, y: 2 } },
     );
     assert.deepEqual(
-        validateAction('report', { title: 't', rule: 'r', where: 'w', extra: 'x' }, SCREEN),
-        { ok: true, action: { tool: 'report', title: 't', rule: 'r', where: 'w' } },
+        validateAction('report', { title: 't', rule: 1, shot: 1, seen: 's', expected: 'e', extra: 'x' }, SCREEN),
+        { ok: true, action: { tool: 'report', title: 't', rule: 1, shot: 1, seen: 's', expected: 'e' } },
     );
 });
 
@@ -299,7 +303,7 @@ test('runScript: primeira mensagem leva regras no sistema e roteiro com a primei
 test('runScript: done encerra com stop done, passos e relatorio', async () => {
     const client = fakeClient([
         reply([call('1', 'screenshot', {})]),
-        reply([call('2', 'report', { title: 'T', rule: 'R', where: 'W' }), call('3', 'done', { summary: 'fim' })]),
+        reply([VIOLATED, call('2', 'report', { title: 'T', rule: 1, shot: 1, seen: 'texto', expected: 'esperado' }), ...CHECKS_OK.slice(1), call('3', 'done', { summary: 'fim' })]),
     ]);
     const result = await run(client, fakeDriver());
     assert.equal(result.stop, 'done');
@@ -321,7 +325,7 @@ test('runScript: 60 chamadas sem done param em max-steps', async () => {
 });
 
 test('runScript: teto de script estourado no turno mantem o report do turno e para no portao seguinte', async () => {
-    const client = fakeClient([reply([call('r', 'report', { title: 'T', rule: 'R', where: 'W' })], { cost: 0.26, prompt_tokens: 10, completion_tokens: 5 })]);
+    const client = fakeClient([reply([VIOLATED, call('r', 'report', { title: 'T', rule: 1, shot: 1, seen: 'texto', expected: 'esperado' })], { cost: 0.26, prompt_tokens: 10, completion_tokens: 5 })]);
     const driver = fakeDriver();
     const result = await run(client, driver);
     assert.equal(result.stop, 'script-budget');
@@ -332,7 +336,7 @@ test('runScript: teto de script estourado no turno mantem o report do turno e pa
 });
 
 test('runScript: done no turno que esgota o teto de script encerra com done', async () => {
-    const client = fakeClient([reply([call('d', 'done', { summary: 'fim' })], { cost: 0.26, prompt_tokens: 10, completion_tokens: 5 })]);
+    const client = fakeClient([reply([...CHECKS_OK, call('d', 'done', { summary: 'fim' })], { cost: 0.26, prompt_tokens: 10, completion_tokens: 5 })]);
     const result = await run(client, fakeDriver());
     assert.equal(result.stop, 'done');
     assert.equal(client.calls.length, 1);
@@ -340,8 +344,8 @@ test('runScript: done no turno que esgota o teto de script encerra com done', as
 });
 
 test('runScript: teto de piloto estourado no turno mantem o report e para no portao seguinte', async () => {
-    const client = fakeClient([reply([call('r', 'report', { title: 'T', rule: 'R', where: 'W' })], { cost: 0.1, prompt_tokens: 10, completion_tokens: 5 })]);
-    const result = await run(client, fakeDriver(), createBudget({ pilotSpentUsd: 4.9 }));
+    const client = fakeClient([reply([VIOLATED, call('r', 'report', { title: 'T', rule: 1, shot: 1, seen: 'texto', expected: 'esperado' })], { cost: 0.03, prompt_tokens: 10, completion_tokens: 5 })]);
+    const result = await run(client, fakeDriver(), createBudget({ pilotSpentUsd: 4.97 }));
     assert.equal(result.stop, 'pilot-budget');
     assert.equal(client.calls.length, 1);
     assert.equal(result.reports.length, 1);
@@ -349,14 +353,14 @@ test('runScript: teto de piloto estourado no turno mantem o report e para no por
 
 test('runScript: piloto no teto nao chama o cliente', async () => {
     const client = fakeClient([reply([call('d', 'done', { summary: 'fim' })])]);
-    const result = await run(client, fakeDriver(), createBudget({ pilotSpentUsd: 4.96 }));
+    const result = await run(client, fakeDriver(), createBudget({ pilotSpentUsd: 4.99 }));
     assert.equal(result.stop, 'pilot-budget');
     assert.equal(result.steps, 0);
     assert.equal(client.calls.length, 0);
 });
 
 test('runScript: prompt acima do limite no turno mantem report e click do turno e para no portao seguinte', async () => {
-    const client = fakeClient([reply([call('r', 'report', { title: 'T', rule: 'R', where: 'W' }), call('1', 'click', { x: 1, y: 1 })], { cost: 0.001, prompt_tokens: 96001, completion_tokens: 0 })]);
+    const client = fakeClient([reply([VIOLATED, call('r', 'report', { title: 'T', rule: 1, shot: 1, seen: 'texto', expected: 'esperado' }), call('1', 'click', { x: 1, y: 1 })], { cost: 0.001, prompt_tokens: 96001, completion_tokens: 0 })]);
     const driver = fakeDriver();
     const result = await run(client, driver);
     assert.equal(result.stop, 'prompt-limit');
@@ -403,7 +407,7 @@ test('runScript: captura que falha vira driver-error', async () => {
 test('runScript: JSON invalido vira mensagem de ferramenta e o driver nao roda', async () => {
     const client = fakeClient([
         reply([rawCall('1', 'click', '{x:')]),
-        reply([call('2', 'done', { summary: 'fim' })]),
+        reply([...CHECKS_OK, call('2', 'done', { summary: 'fim' })]),
     ]);
     const driver = fakeDriver();
     const result = await run(client, driver);
@@ -426,7 +430,7 @@ test('runScript: acao invalida vira mensagem de ferramenta e o driver nao roda',
 });
 
 test('runScript: ferramentas depois de done nao executam', async () => {
-    const client = fakeClient([reply([call('1', 'done', { summary: 'fim' }), call('2', 'click', { x: 1, y: 1 })])]);
+    const client = fakeClient([reply([...CHECKS_OK, call('1', 'done', { summary: 'fim' }), call('2', 'click', { x: 1, y: 1 })])]);
     const driver = fakeDriver();
     const result = await run(client, driver);
     assert.equal(result.stop, 'done');
@@ -442,26 +446,27 @@ test('runScript: mensagens de imagem vem depois de todas as tool messages do tur
     const messages = client.calls[1].messages;
     assert.deepEqual(roles(messages), ['system', 'user', 'assistant', 'tool', 'tool', 'user']);
     assert.equal(messages[4].tool_call_id, 'b');
-    assert.equal(messages[4].content, 'captured');
+    assert.equal(messages[4].content, 'captura 2');
     assert.ok(JSON.stringify(messages[5].content).includes(IMAGE_URL));
 });
 
-test('runScript: relatorio repetido (titulo, regra, onde) fica uma vez so', async () => {
+test('runScript: relatorio repetido (titulo e regra) fica uma vez so', async () => {
+    const report = (id, title) => call(id, 'report', { title, rule: 1, shot: 1, seen: 'texto', expected: 'esperado' });
     const client = fakeClient([
-        reply([call('1', 'report', { title: 'T', rule: 'R', where: 'W' })]),
-        reply([call('2', 'report', { title: 'T', rule: 'R', where: 'W' })]),
-        reply([call('3', 'report', { title: 'T', rule: 'R', where: 'Outro' }), call('4', 'done', { summary: 'fim' })]),
+        reply([VIOLATED, report('1', 'T')]),
+        reply([report('2', 'T')]),
+        reply([report('3', 'Outro'), ...CHECKS_OK.slice(1), call('4', 'done', { summary: 'fim' })]),
     ]);
     const result = await run(client, fakeDriver());
     assert.equal(result.reports.length, 2);
     assert.equal(result.reports[0].step, 1);
-    assert.equal(result.reports[1].where, 'Outro');
+    assert.equal(result.reports[1].title, 'Outro');
 });
 
 test('runScript: zera o script anterior antes da primeira chamada', async () => {
     const budget = createBudget();
     budget.charge({ cost: 0.29, prompt_tokens: 1, completion_tokens: 1 });
-    const client = fakeClient([reply([call('d', 'done', { summary: 'fim' })])]);
+    const client = fakeClient([reply([...CHECKS_OK, call('d', 'done', { summary: 'fim' })])]);
     const result = await run(client, fakeDriver(), budget);
     assert.equal(result.stop, 'done');
     assert.equal(client.calls.length, 1);
@@ -469,12 +474,12 @@ test('runScript: zera o script anterior antes da primeira chamada', async () => 
 
 test('runScript: costUsd e a parte do script somada', async () => {
     const client = fakeClient([
-        reply([call('1', 'screenshot', {})], { cost: 0.1, prompt_tokens: 10, completion_tokens: 5 }),
-        reply([call('2', 'done', { summary: 'fim' })], { cost: 0.05, prompt_tokens: 10, completion_tokens: 5 }),
+        reply([call('1', 'screenshot', {})], { cost: 0.04, prompt_tokens: 10, completion_tokens: 5 }),
+        reply([...CHECKS_OK, call('2', 'done', { summary: 'fim' })], { cost: 0.03, prompt_tokens: 10, completion_tokens: 5 }),
     ]);
     const result = await run(client, fakeDriver());
     assert.equal(result.stop, 'done');
-    assert.ok(Math.abs(result.costUsd - 0.15) < 1e-9);
+    assert.ok(Math.abs(result.costUsd - 0.07) < 1e-9);
 });
 
 // --- confirmReport ---
@@ -509,7 +514,7 @@ test('confirmReport: envia uma unica ferramenta forcada e a captura do relatorio
 
 test('confirmReport: orcamento recusado vira null sem chamar o cliente', async () => {
     const client = fakeClient([verdictReply(true, 'ok')]);
-    const result = await confirmReport({ client, report: REPORT, rules: RULES, budget: createBudget({ pilotSpentUsd: 4.96 }) });
+    const result = await confirmReport({ client, report: REPORT, rules: RULES, budget: createBudget({ pilotSpentUsd: 4.99 }) });
     assert.deepEqual(result, { confirmed: null, why: 'pilot-budget' });
     assert.equal(client.calls.length, 0);
 });
