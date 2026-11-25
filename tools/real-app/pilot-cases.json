@@ -1,0 +1,31 @@
+{
+  "script": "Você está testando um app de desktop que mostra uma barra (HUD) com o consumo de contas de IA. A tela é um desktop preto com só a barra do app. Use o app como um usuário curioso: passe o ponteiro sobre a barra, sobre cada conta e sobre os botões nas pontas, espere o balão abrir, leia o conteúdo, minimize uma conta e restaure, afaste o ponteiro e veja o que sobra na tela. Capture a tela depois de cada ação. Compare o que vê com as regras. Só registre com report o que viola uma regra e que você viu na captura; não registre suspeita nem preferência. Os dados são de exemplo e a rede está bloqueada: falha de conexão e conta sem atualizar são esperadas. Quando tiver visto as contas e os botões, chame done.",
+  "gear-balloon": {
+    "issue": 623,
+    "badTag": "v42.3.0-beta.12",
+    "goodTag": "v42.3.0-beta.13",
+    "scenario": "pilot-gear-floating",
+    "probe": [{ "tool": "screenshot" }]
+  },
+  "balloon-stays": {
+    "issue": 631,
+    "badTag": "v42.3.0-beta.16",
+    "goodTag": "v42.3.0-beta.17",
+    "scenario": "pilot-two-accounts",
+    "probe": [{ "tool": "screenshot" }]
+  },
+  "thin-bar": {
+    "issue": 596,
+    "badTag": "v42.3.0-beta.6",
+    "goodTag": "v42.3.0-beta.7",
+    "scenario": "pilot-seven-left",
+    "probe": [{ "tool": "screenshot" }]
+  },
+  "reset-date": {
+    "issue": 474,
+    "badTag": "v42.0.0-beta.4",
+    "goodTag": "v42.0.0-beta.5",
+    "scenario": "pilot-weekly-monthly",
+    "probe": [{ "tool": "screenshot" }]
+  }
+}
