@@ -9,6 +9,14 @@ identidade `claude <claude@anthropic.com>`. Parte da #644. Este plano cobre só 
 Piloto aprovado com teto de **US$ 5**, pelo OpenRouter, segredo `OPENROUTER_API_KEY` no GitHub. Haiku 5.5 navega; Sonnet 5.5
 confirma só as suspeitas; nada abre issue sozinho.
 
+## Decisões do dono (2026-11-25), que trocam as de cima
+
+- **Chave:** a já configurada, sem limite no OpenRouter, por decisão do dono. O teto fica no código e no `usage` da própria chave: a chave é só do
+  piloto (uso zero em 2026-11-25), então `usage` é o gasto acumulado, e nenhum roteiro começa se `usage` mais a reserva passar de US$ 5.
+- **Modelo:** sempre Haiku 5.5, também na confirmação e na segunda tentativa.
+- **Destino:** o dono analisa o relatório junto. Se valer a pena, o agente passa a criar a issue; a correção segue o workflow. Fora desta atividade.
+- **Aviso ao dono antes do primeiro disparo pago.**
+
 ## Fatos confirmados (2026-11-24)
 
 - `GET https://openrouter.ai/api/v1/models`: `anthropic/claude-haiku-5.5` aceita imagem e ferramentas; US$ 0,10 / 0,50 por
@@ -60,7 +68,9 @@ na versão boa é conferido à mão antes de contar como falso.
 ## Atividades
 
 - **A01** — plano e mapa dos casos. **A02** — laço, ferramentas e orçamento em TDD, com cliente falso (sem gasto).
-- **A03** — driver de tela no runner e workflow. **A04** — rodada paga e medição. **A05** — relatório e decisão.
+- **A03** — driver de tela no runner e workflow, em três partes: **A03a** `ai-pilot.mjs` (chave sem limite, gasto acumulado, só Haiku) e
+  `ai-pilot-driver.mjs`; **A03b** `screen-driver.ps1` e sementes dos 4 casos; **A03c** `ai-pilot-run.mjs`, catálogo de casos, regras e
+  `ai-pilot.yml`. Prova sem IA (`dry`): cada defeito visto na tela da versão ruim e ausente na boa. **A04** — rodada paga e medição. **A05** — relatório e decisão.
 
 ## Ponto de situação
 
@@ -71,6 +81,6 @@ na versão boa é conferido à mão antes de contar como falso.
 
 ## Problemas em aberto e riscos
 
-- A chave foi colada no chat e fica no histórico local da sessão: trocar depois do piloto.
+- A chave foi colada no chat, não tem limite e o dono decidiu mantê-la: se o código errar a conta, nada no OpenRouter interrompe antes do saldo.
 - Texto na tela do app é dado sintético; o agente não navega na internet, e a rede do app fica bloqueada.
 - Pode não haver 10 casos que atendam à regra da verdade conhecida; o critério é percentual por isso.
