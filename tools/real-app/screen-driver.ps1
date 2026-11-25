@@ -259,6 +259,7 @@ $KEYS = @{
 
 $script:shotIndex = 0
 $script:buttonDown = $false
+$script:lastPoint = $null
 $script:vs = [System.Drawing.Rectangle]::Empty
 
 function Write-Diag([string]$message) {
@@ -288,6 +289,20 @@ function Get-ScreenPoint([int]$x, [int]$y) {
 function Move-Pointer([int]$x, [int]$y) {
     $point = Get-ScreenPoint $x $y
     if (-not [ScreenDriverNative]::MoveTo($point.X, $point.Y, $script:vs)) { throw 'SendInput move failed' }
+    $script:lastPoint = @($x, $y)
+}
+
+# Moves like a hand: 12 steps of 15 ms from the last point. A jump skips the enter and move events of what lies between.
+function Move-Smooth([int]$x, [int]$y) {
+    [void](Get-ScreenPoint $x $y)
+    $from = $script:lastPoint
+    if ($null -ne $from) {
+        for ($step = 1; $step -lt 12; $step++) {
+            Move-Pointer ([int][math]::Round($from[0] + ($x - $from[0]) * $step / 12)) ([int][math]::Round($from[1] + ($y - $from[1]) * $step / 12))
+            Start-Sleep -Milliseconds 15
+        }
+    }
+    Move-Pointer $x $y
 }
 
 function Set-Button([bool]$down) {
@@ -306,13 +321,14 @@ function Invoke-Tool($request) {
             return @{ image = [Convert]::ToBase64String($jpeg) }
         }
         'click' {
-            Move-Pointer (Get-IntField $request 'x') (Get-IntField $request 'y')
+            Move-Smooth (Get-IntField $request 'x') (Get-IntField $request 'y')
+            Start-Sleep -Milliseconds 120
             Set-Button $true
-            Start-Sleep -Milliseconds 40
+            Start-Sleep -Milliseconds 80
             Set-Button $false
         }
         'move' {
-            Move-Pointer (Get-IntField $request 'x') (Get-IntField $request 'y')
+            Move-Smooth (Get-IntField $request 'x') (Get-IntField $request 'y')
         }
         'drag' {
             # All four fields are read and checked before the first pointer move.

@@ -156,6 +156,12 @@ $cache = [ordered]@{
 }
 $cache | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $DataDir 'dashboard-cache.json') -Encoding utf8
 
+# Sources that need an API key are hidden without one (API_KEY_DEPENDENT_SOURCES): a placeholder, never a real key.
+if ($Scenario -in @('pilot-seven-left', 'pilot-weekly-monthly')) {
+    [ordered]@{ minimax = 'example-not-a-key'; deepSeek = 'example-not-a-key'; openCodeGo = 'example-not-a-key' } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $DataDir 'api-keys.json') -Encoding utf8
+}
+
 # --- java.util.prefs node (Windows registry, HKCU\Software\JavaSoft\Prefs) -----------
 function ConvertTo-JavaPrefsName([string]$text) {
     # Simple encoding of WindowsPreferences.toWindowsName, valid for ASCII names only.

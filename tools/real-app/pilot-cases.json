@@ -5,27 +5,115 @@
     "badTag": "v42.3.0-beta.12",
     "goodTag": "v42.3.0-beta.13",
     "scenario": "pilot-gear-floating",
-    "probe": [{ "tool": "screenshot" }]
+    "probe": [
+      {
+        "tool": "move",
+        "x": 511,
+        "y": 168
+      },
+      {
+        "tool": "wait",
+        "ms": 2000
+      },
+      {
+        "tool": "move",
+        "x": 597,
+        "y": 446
+      },
+      {
+        "tool": "wait",
+        "ms": 2500
+      }
+    ]
   },
   "balloon-stays": {
     "issue": 631,
     "badTag": "v42.3.0-beta.16",
     "goodTag": "v42.3.0-beta.17",
     "scenario": "pilot-two-accounts",
-    "probe": [{ "tool": "screenshot" }]
+    "probe": [
+      {
+        "tool": "move",
+        "x": 435,
+        "y": 40
+      },
+      {
+        "tool": "wait",
+        "ms": 2000
+      },
+      {
+        "tool": "move",
+        "x": 432,
+        "y": 200
+      },
+      {
+        "tool": "wait",
+        "ms": 300
+      },
+      {
+        "tool": "move",
+        "x": 432,
+        "y": 294
+      },
+      {
+        "tool": "wait",
+        "ms": 1000
+      },
+      {
+        "tool": "click",
+        "x": 432,
+        "y": 294
+      },
+      {
+        "tool": "wait",
+        "ms": 2000
+      }
+    ]
   },
   "thin-bar": {
     "issue": 596,
     "badTag": "v42.3.0-beta.6",
     "goodTag": "v42.3.0-beta.7",
     "scenario": "pilot-seven-left",
-    "probe": [{ "tool": "screenshot" }]
+    "probe": [
+      {
+        "tool": "screenshot"
+      },
+      {
+        "tool": "move",
+        "x": 40,
+        "y": 500
+      },
+      {
+        "tool": "wait",
+        "ms": 2000
+      }
+    ]
   },
   "reset-date": {
     "issue": 474,
     "badTag": "v42.0.0-beta.4",
     "goodTag": "v42.0.0-beta.5",
     "scenario": "pilot-weekly-monthly",
-    "probe": [{ "tool": "screenshot" }]
+    "probe": [
+      {
+        "tool": "move",
+        "x": 450,
+        "y": 40
+      },
+      {
+        "tool": "wait",
+        "ms": 2000
+      },
+      {
+        "tool": "move",
+        "x": 560,
+        "y": 40
+      },
+      {
+        "tool": "wait",
+        "ms": 2000
+      }
+    ]
   }
 }

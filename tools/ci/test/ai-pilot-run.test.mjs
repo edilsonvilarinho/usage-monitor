@@ -194,13 +194,16 @@ test('pilot-cases.json tem os quatro casos com ids únicos e tags válidas', () 
     }
 });
 
-test('pilot-cases.json aponta só para cenários do ValidateSet do seed.ps1 e probes de screenshot', () => {
+import { validateAction } from '../ai-pilot.mjs';
+
+test('pilot-cases.json aponta só para cenários do ValidateSet do seed.ps1 e todo probe passa em validateAction numa tela 1024x768', () => {
+    const PROBE_SCREEN = { width: 1024, height: 768 };
     assert.ok(SCENARIOS.length > 0);
     for (const id of ids) {
         const item = cases[id];
         assert.ok(SCENARIOS.includes(item.scenario), `${id}: ${item.scenario}`);
         assert.ok(Array.isArray(item.probe) && item.probe.length > 0, id);
-        for (const action of item.probe) assert.equal(action.tool, 'screenshot', id);
+        for (const action of item.probe) assert.equal(validateAction(action.tool, action, PROBE_SCREEN).ok, true, `${id}: ${action.tool}`);
     }
 });
 
@@ -213,10 +216,11 @@ test('script e regras não citam número de issue nem a palavra defeito', () => 
     for (const id of ids) assert.equal(cases.script.includes(String(cases[id].issue)), false, id);
 });
 
-test('pilot-rules.md tem o cabeçalho literal e as 9 regras numeradas', () => {
+test('pilot-rules.md tem o cabeçalho literal, as 9 regras numeradas e a regra 5 com a exceção de reticências e dica', () => {
     const rules = readFileSync(RULES_PATH, 'utf8');
     assert.match(rules, /^Regras do produto\. Um achado precisa citar a regra pelo número\./);
     assert.equal(rules.match(/^\d\. /gm).length, 9);
+    assert.match(rules, /^5\. Nenhum texto aparece cortado no meio, sobreposto a outro ou fora da área dele\. Reticências no fim de um nome e a dica que aparece sobre um botão são normais\.$/m);
 });
 
 // Gravação de transcrição e resultado do modo dry (#653, 3c/3d): nunca imagem nem chave.
