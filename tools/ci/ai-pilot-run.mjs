@@ -36,6 +36,22 @@ export function planBudget({ ledgerUsd, jobs, maxScriptUsd, maxPilotUsd }) {
     return { ok: worstCaseUsd <= maxPilotUsd + EPSILON, worstCaseUsd }
 }
 
+// Decide caso, lado, versão e chave antes de qualquer I/O. Recusa sai 2, sem rede nem driver.
+export function planRun({ caseId, side, mode }, cases, env) {
+    const item = cases[caseId]
+    if (NON_CASE_KEYS.includes(caseId) || !item) return { ok: false, error: `caso desconhecido: ${caseId}`, exit: EXIT_USAGE }
+    if (mode === 'paid' && !env.OPENROUTER_API_KEY) return { ok: false, error: 'OPENROUTER_API_KEY ausente', exit: EXIT_USAGE }
+    return { ok: true, item, version: side === 'bad' ? item.badTag : item.goodTag }
+}
+
+// Valor de `--jobs`: inteiro maior que 0; ausente, zero, fracionário ou texto vira null.
+export function parseJobs(argv) {
+    const index = argv.indexOf('--jobs')
+    if (index === -1) return null
+    const jobs = Number(argv[index + 1])
+    return Number.isInteger(jobs) && jobs >= 1 ? jobs : null
+}
+
 // Argumentos da linha de comando. Opção ausente, valor fora da lista ou flag desconhecida é erro.
 export function parseArgs(argv) {
     const options = {}
@@ -253,9 +269,8 @@ async function runMode({ mode, driver, item, env, out, caseId, side, version }) 
 
 // `--plan-budget --jobs n`: confere o pior caso do lote contra o teto do piloto, sem rede e sem driver. Sai 3 se passa do teto.
 async function planMain(argv) {
-    const index = argv.indexOf('--jobs')
-    const jobs = index === -1 ? NaN : Number(argv[index + 1])
-    if (!Number.isInteger(jobs) || jobs < 1) {
+    const jobs = parseJobs(argv)
+    if (jobs === null) {
         process.stderr.write('uso: --plan-budget --jobs <inteiro maior que 0>\n')
         return EXIT_USAGE
     }
@@ -274,16 +289,12 @@ async function main(argv, env) {
     }
     const { mode, caseId, side, exe, dataDir, out } = parsed.options
     const cases = JSON.parse(await readFile(CASES_FILE, 'utf8'))
-    const item = cases[caseId]
-    if (NON_CASE_KEYS.includes(caseId) || !item) {
-        process.stderr.write(`caso desconhecido: ${caseId}\n`)
-        return EXIT_USAGE
+    const plan = planRun({ caseId, side, mode }, cases, env)
+    if (!plan.ok) {
+        process.stderr.write(`${plan.error}\n`)
+        return plan.exit
     }
-    if (mode === 'paid' && !env.OPENROUTER_API_KEY) {
-        process.stderr.write('OPENROUTER_API_KEY ausente\n')
-        return EXIT_USAGE
-    }
-    const version = side === 'bad' ? item.badTag : item.goodTag
+    const { item, version } = plan
     let driver = null
     try {
         await mkdir(out, { recursive: true })

@@ -323,21 +323,26 @@ function repeatRefusal(state, name, rawArguments) {
 const zoomKeyOf = (action) => [action.x, action.y, action.w, action.h].join(',')
 
 // Motivo da recusa do cover entre as capturas A e B; null quando aceita. A linha do tempo só tem ações que o driver executou.
-// Impossível aceita imagens iguais: a tentativa é o que prova a impossibilidade.
+// A última ação de ponteiro entre A e B precisa ser a que o item pede, e nenhuma captura inteira pode vir depois dela (zoom não conta).
+// Cover já aceito para o item é recusado. Impossível aceita imagens iguais: a tentativa é o que prova a impossibilidade.
 function coverRefusal(state, { item, before, after, possible }) {
     if (!state.images.has(before)) return `erro: captura ${before} não existe`
     if (!state.images.has(after)) return `erro: captura ${after} não existe`
     if (state.zoomShots.has(before)) return zoomRefusal(before)
     if (state.zoomShots.has(after)) return zoomRefusal(after)
-    if (possible !== false && state.images.get(before) === state.images.get(after)) return `erro: cover recusado: capturas ${before} e ${after} têm imagens iguais; a ação não mudou a tela`
+    if (state.covers.has(item)) return `erro: cover já aceito para ${item}`
     const clickOnly = CLICK_ONLY_ITEMS.includes(item)
     const allowed = clickOnly ? ['click'] : POINTER_TOOLS
     const start = state.timeline.findIndex((entry) => entry.kind === 'shot' && entry.shot === before)
     const end = state.timeline.findIndex((entry) => entry.kind === 'shot' && entry.shot === after)
-    const between = state.timeline.slice(start + 1, end).filter((entry) => entry.kind === 'action')
-    if (between.some((entry) => allowed.includes(entry.tool))) return null
+    const between = state.timeline.slice(start + 1, end)
+    const pointerIndex = between.map((entry) => entry.kind === 'action' && POINTER_TOOLS.includes(entry.tool)).lastIndexOf(true)
     const hint = clickOnly ? 'clique no botão do balão' : 'mover o ponteiro, clicar ou arrastar'
-    return `erro: cover recusado: falta ação entre as capturas ${before} e ${after}; use ${hint}`
+    if (pointerIndex === -1 || !allowed.includes(between[pointerIndex].tool)) return `erro: cover recusado: falta ação entre as capturas ${before} e ${after}; use ${hint}`
+    if (possible === false) return null
+    const fullShotAfter = between.slice(pointerIndex + 1).some((entry) => entry.kind === 'shot' && !state.zoomShots.has(entry.shot))
+    if (fullShotAfter) return `erro: cover recusado: captura inteira depois da última ação entre as capturas ${before} e ${after}; a ação precisa ser a última antes da captura ${after}`
+    return null
 }
 
 function recordCover(state, action) {

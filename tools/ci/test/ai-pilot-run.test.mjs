@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { childEnv, parseArgs, planEvidence, renderReport, runDry, runPaid } from '../ai-pilot-run.mjs';
+import { childEnv, exitCodeOf, parseArgs, parseJobs, planEvidence, planRun, renderReport, runDry, runPaid } from '../ai-pilot-run.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REAL_APP = resolve(HERE, '..', '..', 'real-app');
@@ -76,6 +76,38 @@ test('parseArgs recusa opção obrigatória ausente, modo ou lado fora da lista 
 });
 
 // Modo dry ----------------------------------------------------------------
+
+const PLAN_CASES = { 'gear-balloon': { badTag: 'v1.0.0', goodTag: 'v1.1.0' }, script: 'roteiro', coverage: [] };
+
+test('planRun recusa caso desconhecido e chave que não é caso, com saída 2', () => {
+    assert.deepEqual(planRun({ caseId: 'nada', side: 'bad', mode: 'dry' }, PLAN_CASES, {}), { ok: false, error: 'caso desconhecido: nada', exit: 2 });
+    assert.equal(planRun({ caseId: 'script', side: 'bad', mode: 'dry' }, PLAN_CASES, {}).ok, false);
+    assert.equal(planRun({ caseId: 'coverage', side: 'bad', mode: 'dry' }, PLAN_CASES, {}).ok, false);
+});
+
+test('planRun escolhe badTag para o lado bad e goodTag para o lado good', () => {
+    assert.equal(planRun({ caseId: 'gear-balloon', side: 'bad', mode: 'dry' }, PLAN_CASES, {}).version, 'v1.0.0');
+    assert.equal(planRun({ caseId: 'gear-balloon', side: 'good', mode: 'dry' }, PLAN_CASES, {}).version, 'v1.1.0');
+});
+
+test('planRun pago sem OPENROUTER_API_KEY recusa com saída 2 e com a chave passa', () => {
+    assert.deepEqual(planRun({ caseId: 'gear-balloon', side: 'bad', mode: 'paid' }, PLAN_CASES, {}), { ok: false, error: 'OPENROUTER_API_KEY ausente', exit: 2 });
+    assert.equal(planRun({ caseId: 'gear-balloon', side: 'bad', mode: 'paid' }, PLAN_CASES, { OPENROUTER_API_KEY: 'k' }).ok, true);
+});
+
+test('parseJobs aceita inteiro maior que 0 e recusa ausente, zero, fracionário e texto', () => {
+    assert.equal(parseJobs(['--jobs', '3']), 3);
+    assert.equal(parseJobs(['--jobs', '1']), 1);
+    assert.equal(parseJobs(['--plan-budget']), null);
+    assert.equal(parseJobs(['--jobs', '0']), null);
+    assert.equal(parseJobs(['--jobs', '1.5']), null);
+    assert.equal(parseJobs(['--jobs', 'x']), null);
+});
+
+test('exitCodeOf: só done é 0; roteiro sem done aceito é 4', () => {
+    assert.equal(exitCodeOf('done'), 0);
+    for (const stop of ['done-incomplete', 'max-steps', 'no-tool-call']) assert.equal(exitCodeOf(stop), 4);
+});
 
 test('runDry recusa a lista inteira quando uma ação é inválida, antes de executar qualquer uma', async () => {
     const driver = fakeDriver();
