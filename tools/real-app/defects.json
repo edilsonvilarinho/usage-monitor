@@ -123,5 +123,35 @@
       "docked-right-idle": "pulsed",
       "docked-top-hole-idle": "pulsed"
     }
+  },
+  "prewarm-visible": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/WindowsDwmCloak.kt",
+        "find": "IntByReference(if (cloaked) 1 else 0)",
+        "replace": "IntByReference(0)"
+      },
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/AppDialogWindow.kt",
+        "find": "window.focusableWindowState = false\n        setWindowOpacity(window, 0f)",
+        "replace": "window.focusableWindowState = false\n        setWindowOpacity(window, 1f)"
+      },
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/AppDialogWindow.kt",
+        "find": "awaitAwtEventTurn()\n                    host.onScreen = false",
+        "replace": "delay(150L)\n                    awaitAwtEventTurn()\n                    host.onScreen = false"
+      }
+    ],
+    "expect": {
+      "floating-idle": "flash",
+      "docked-top-idle": "flash",
+      "docked-bottom-idle": "flash",
+      "docked-left-idle": "flash",
+      "docked-right-idle": "flash",
+      "docked-top-hover": "flash",
+      "floating-drag": "flash",
+      "docked-top-hole-idle": "flash",
+      "docked-top-hole-hover": "flash"
+    }
   }
 }

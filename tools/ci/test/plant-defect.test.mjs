@@ -20,6 +20,7 @@ const DEFECT_NAMES = [
     'hole-opens-alone',
     'opens-and-stays',
     'opens-late-and-stays',
+    'prewarm-visible',
 ]
 // Veredictos que o detector imprime (hud-pulses.mjs); defeito com veredito fora disso nunca dispara.
 const DETECTOR_VERDICTS = [
@@ -34,7 +35,9 @@ const DETECTOR_VERDICTS = [
     'not-moved',
     'wrong-place',
     'wrong-scene',
+    'flash',
 ]
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url))
 const SOURCE_DIR = 'src/desktopMain/kotlin/com/usagemonitor'
 const WINDOW_FILE = `${SOURCE_DIR}/HudWindow.kt`
 const BALLOON_FILE = `${SOURCE_DIR}/presentation/ui/HudNotchBalloonState.kt`
@@ -131,7 +134,7 @@ test('CLI: --expect de cenario fora do defeito imprime linha vazia e sai 0', () 
     assert.equal(result.stdout, '\n')
 })
 
-test('defects.json: os seis defeitos existem, com edits, expect, cenarios em ALL= e veredictos do detector', () => {
+test('defects.json: os defeitos existem, com edits, expect, cenarios em ALL= e veredictos do detector', () => {
     assert.deepEqual(Object.keys(DEFECTS).sort(), [...DEFECT_NAMES].sort())
     const scenarios = workflowScenarios()
     for (const name of DEFECT_NAMES) {
@@ -149,4 +152,19 @@ test('defects.json: os seis defeitos existem, com edits, expect, cenarios em ALL
             assert.ok(DETECTOR_VERDICTS.includes(verdict), `${name}: veredito ${verdict} nao e do detector`)
         }
     }
+})
+
+test('defects.json: cada find dos defeitos ocorre exatamente uma vez no codigo-fonte real', () => {
+    for (const name of DEFECT_NAMES) {
+        assert.ok(DEFECTS[name], `${name}: ausente do defects.json`)
+        for (const edit of DEFECTS[name].edits) {
+            const text = readFileSync(join(REPO_ROOT, edit.file), 'utf8')
+            assert.doesNotThrow(() => plantEdit(text, edit.find, edit.replace), `${name}: ${edit.file}`)
+        }
+    }
+})
+
+test('defects.json: prewarm-visible espera flash nos cenarios de ALL=', () => {
+    assert.ok(DEFECTS['prewarm-visible'], 'prewarm-visible ausente do defects.json')
+    assert.deepEqual(DEFECTS['prewarm-visible'].expect, Object.fromEntries(workflowScenarios().map((scenario) => [scenario, 'flash'])))
 })
