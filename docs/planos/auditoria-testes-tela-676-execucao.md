@@ -49,6 +49,7 @@ Saber o que cada teste de tela feito pelo Claude prova, e corrigir o que não pr
 | A05f (comparação de telas) | `mutate.mjs`; `screen-diff.test.mjs` 33/33 | 76,4% → **95,9%** (10 equivalentes, 2 de CSS); arquivo não comparado e erro de decodificação aparecem e saem 2 |
 | A05g (cloak) | PR #677 (`2dd23f18`), CI 45666637269, gravação 9/9 | vermelho em 9 asserções (`ModalPrewarmTest.kt:119 :138 :180 :194 :207 :236 :244 :252 :260`), verde 133/133, diff 95,7%. Janela ainda visível não perde o cloak; recusas vão para a trilha; `WindowsDwmCloakTest` pula fora do Windows |
 | A05d (piloto) | `ai-pilot-{adversary,loop,replay,limits,window,main}.test.mjs`; replay das 11 transcrições pagas; `mutate.mjs` depois | motor 79,3% → **95,6%**, executor 55,0% → **92,3%**, driver 72,7% → **98,2%**. **Causa raiz do laço:** o `zoom` era limitado a meia tela (384 px) e a barra tem 430; toda chamada era inválida e nada barrava repetição de inválida. Agora os dois laços param em `stuck` (passos 31 e 11, eram 60) e nenhuma execução legítima teve ação recusada por repetição. A 1ª correção do agente passava no teste dele e falhava na transcrição real (tela diferente no teste). Sem chave em arquivo, saída ou processo filho (teste de ponta a ponta) |
+| A05 (prova final) | run [45672620350](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45672620350), `509d298d`, 12 defeitos × 3 | 37/37 jobs, 1ª tentativa, **138/138** vereditos exatos, saúde `ok` em 138; `node --test "tools/ci/test/*.test.mjs"` 531/531 (eram 303) |
 
 ## O que continua sem prova
 
