@@ -7,7 +7,8 @@
 //   node tools/ci/screen-diff.mjs --base <dir> --head <dir> --out <dir>
 //
 // Saida 0 com ou sem tela alterada; 2 em erro de uso, diretorio ausente ou
-// vazio, ou PNG que nao decodifica.
+// vazio, ou arquivo que nao se compara (estado `não comparado`, com motivo em
+// stderr). O relatorio e gravado mesmo com a saida 2.
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -17,6 +18,7 @@ const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 // Tipo de cor do PNG -> bytes por pixel: so RGB (2) e RGBA (6), 8 bits.
 const CHANNELS = { 2: 3, 6: 4 }
 const KINDS = new Set(['.png', '.gif'])
+const SKIPPED = 'não comparado'
 
 export function decodePng(buffer) {
     if (!buffer.subarray(0, 8).equals(SIGNATURE)) throw new Error('nao e PNG')
@@ -161,14 +163,38 @@ export function compareDirs(baseFiles, headFiles) {
     return names.map((name) => compareFile(name, baseFiles.get(name), headFiles.get(name)))
 }
 
+// Extensao primeiro: arquivo fora de png e gif nao e comparado, nem se for igual.
 function compareFile(name, base, head) {
+    const kind = extname(name).toLowerCase()
+    if (!KINDS.has(kind)) return naoComparado(name, `extensão ${kind || '(sem)'} fora de png e gif`)
     if (!base) return { name, status: 'nova', changed: null, box: null }
     if (!head) return { name, status: 'removida', changed: null, box: null }
     if (base.equals(head)) return { name, status: 'igual', changed: 0, box: null }
-    if (extname(name).toLowerCase() !== '.png') return { name, status: 'mudou', changed: null, box: null }
-    const result = comparePixels(decodePng(base), decodePng(head))
+    if (kind !== '.png') return { name, status: 'mudou', changed: null, box: null }
+    return comparePng(name, base, head)
+}
+
+// PNG que nao decodifica nao vira `mudou` nem `igual`: fica sem comparacao, com o lado que falhou.
+function comparePng(name, base, head) {
+    let before
+    let after
+    try {
+        before = decodePng(base)
+    } catch (error) {
+        return naoComparado(name, `antes: ${error.message}`)
+    }
+    try {
+        after = decodePng(head)
+    } catch (error) {
+        return naoComparado(name, `depois: ${error.message}`)
+    }
+    const result = comparePixels(before, after)
     const status = result.sameSize && result.changed === 0 ? 'igual' : 'mudou'
     return { name, status, changed: result.changed, box: result.box }
+}
+
+function naoComparado(name, reason) {
+    return { name, status: SKIPPED, changed: null, box: null, reason }
 }
 
 function boxText(box) {
@@ -177,17 +203,20 @@ function boxText(box) {
 
 export function renderMarkdown(rows) {
     const count = (status) => rows.filter((row) => row.status === status).length
+    const skipped = count(SKIPPED)
+    const skippedText = skipped > 0 ? `, ${skipped} ${SKIPPED}` : ''
     const lines = [
         '## Telas antes e depois',
         '',
-        `**${count('mudou')} mudou**, ${count('igual')} igual, ${count('nova')} nova, ${count('removida')} removida.`,
+        `**${count('mudou')} mudou**, ${count('igual')} igual, ${count('nova')} nova, ${count('removida')} removida${skippedText}.`,
         '',
         '| Tela | Estado | Pixels alterados | Caixa |',
         '|---|---|---|---|',
     ]
     for (const row of rows) {
         const name = row.name.replaceAll('|', '\\|')
-        lines.push(`| \`${name}\` | ${row.status} | ${row.changed ?? '--'} | ${boxText(row.box)} |`)
+        const state = row.status === SKIPPED ? `${SKIPPED} (${row.reason})` : row.status
+        lines.push(`| \`${name}\` | ${state} | ${row.changed ?? '--'} | ${boxText(row.box)} |`)
     }
     return `${lines.join('\n')}\n`
 }
@@ -197,10 +226,11 @@ function escapeHtml(text) {
 }
 
 // Os caminhos sao os que `writeOutput` grava: before/, after/ e diff/ (so com caixa).
+// `não comparado` nao tem figura: nao ha imagem comparada para mostrar.
 export function renderHtml(rows) {
     const sections = rows.map((row) => {
         const file = encodeURIComponent(row.name)
-        const panels = [
+        const panels = row.status === SKIPPED ? [] : [
             ['Antes', row.status === 'nova' ? null : `before/${file}`],
             ['Depois', row.status === 'removida' ? null : `after/${file}`],
             ['Diferenca', row.box === null ? null : `diff/${file}`],
@@ -209,7 +239,8 @@ export function renderHtml(rows) {
             .filter(([, src]) => src !== null)
             .map(([label, src]) => `<figure><figcaption>${label}</figcaption><img src="${escapeHtml(src)}" alt=""></figure>`)
         const title = escapeHtml(row.name)
-        return `<section><h2>${title}</h2><p>${escapeHtml(row.status)} -- ${row.changed ?? '--'} pixels</p><div class="trio">${figures.join('')}</div></section>`
+        const reason = row.status === SKIPPED ? ` (${escapeHtml(row.reason)})` : ''
+        return `<section><h2>${title}</h2><p>${escapeHtml(row.status)}${reason} -- ${row.changed ?? '--'} pixels</p><div class="trio">${figures.join('')}</div></section>`
     })
     return `<!doctype html>
 <html lang="pt-BR">
@@ -250,20 +281,14 @@ export function parseArgs(argv) {
     return options
 }
 
-// Le as imagens do diretorio e confere que cada PNG decodifica.
+// Le todo arquivo regular do diretorio. Quem julga cada um e compareFile.
 function readScreens(dir) {
     if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new Error(`diretorio ausente: ${dir}`)
     const files = new Map()
     for (const name of readdirSync(dir).sort()) {
         const path = join(dir, name)
-        if (!KINDS.has(extname(name).toLowerCase()) || !statSync(path).isFile()) continue
-        const bytes = readFileSync(path)
-        try {
-            if (extname(name).toLowerCase() === '.png') decodePng(bytes)
-        } catch (error) {
-            throw new Error(`${name}: ${error.message}`)
-        }
-        files.set(name, bytes)
+        if (!statSync(path).isFile()) continue
+        files.set(name, readFileSync(path))
     }
     if (files.size === 0) throw new Error(`nenhuma imagem em ${dir}`)
     return files
@@ -272,6 +297,7 @@ function readScreens(dir) {
 function writeOutput(out, rows, base, head) {
     for (const dir of ['before', 'after', 'diff']) mkdirSync(join(out, dir), { recursive: true })
     for (const row of rows) {
+        if (row.status === SKIPPED) continue
         if (base.has(row.name)) writeFileSync(join(out, 'before', row.name), base.get(row.name))
         if (head.has(row.name)) writeFileSync(join(out, 'after', row.name), head.get(row.name))
         if (row.box !== null) {
@@ -291,6 +317,9 @@ function main() {
     const text = renderMarkdown(rows)
     process.stdout.write(text)
     if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${text}\n`)
+    const skipped = rows.filter((row) => row.status === SKIPPED)
+    for (const row of skipped) console.error(`${row.name}: ${row.reason}`)
+    if (skipped.length > 0) process.exitCode = 2
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
