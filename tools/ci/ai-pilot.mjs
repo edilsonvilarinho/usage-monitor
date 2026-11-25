@@ -47,7 +47,7 @@ export const TOOLS = [
     tool('key', 'Pressiona uma tecla da lista permitida.', { name: { type: 'string', enum: KEYS } }, ['name']),
     tool('wait', 'Espera em milissegundos.', { ms: INT }, ['ms']),
     tool('check', 'Veredito de uma regra. seen é o texto literal da captura; not_seen dispensa shot.', { rule: RULE, shot: INT, seen: TEXT, verdict: { type: 'string', enum: VERDICTS } }, ['rule', 'seen', 'verdict']),
-    tool('cover', 'Marca um item de cobertura com duas capturas inteiras, before < after, e a ação entre elas: click para minimize e restore; move, click ou drag para os demais. possible false marca impossível e dispensa capturas.', { item: TEXT, before: INT, after: INT, seen: TEXT, possible: { type: 'boolean' } }, ['item', 'seen']),
+    tool('cover', 'Marca um item de cobertura com duas capturas inteiras, before < after, e a ação entre elas: click para minimize e restore; move, click ou drag para os demais. possible false marca impossível: exige as mesmas capturas e a mesma ação, e aceita imagens iguais.', { item: TEXT, before: INT, after: INT, seen: TEXT, possible: { type: 'boolean' } }, ['item', 'seen']),
     tool('report', 'Registra um achado de regra com check violated.', { title: TEXT, rule: RULE, shot: INT, seen: TEXT, expected: TEXT }, ['title', 'rule', 'shot', 'seen', 'expected']),
     tool('done', 'Encerra o roteiro com um resumo.', { summary: TEXT }, ['summary']),
 ]
@@ -187,11 +187,14 @@ export function validateAction(name, args, screen) {
             const item = textOf(input.item)
             const seen = textOf(input.seen)
             if (!item || !seen) return bad('campo inválido em cover: item e seen não vazios')
-            if (input.possible === false) return ok({ tool: 'cover', item, seen, possible: false })
+            const impossible = input.possible === false
+            const tail = impossible ? IMPOSSIBLE_TAIL : ''
             if (!isShot(input.before) || !isShot(input.after) || input.before >= input.after) {
-                return bad('cover exige before e after (números de captura) com before < after, ou possible false')
+                return bad(`cover exige before e after (números de captura) com before < after${tail}`)
             }
-            return ok({ tool: 'cover', item, before: input.before, after: input.after, seen })
+            const action = { tool: 'cover', item, before: input.before, after: input.after, seen }
+            if (impossible) action.possible = false
+            return ok(action)
         }
         case 'report': {
             const title = textOf(input.title)
@@ -290,15 +293,18 @@ function recordCheck(state, action) {
 
 // Ações que contam entre as capturas de um cover. minimize e restore pedem clique no botão do balão.
 const CLICK_ONLY_ITEMS = ['minimize', 'restore']
+// Acrescentado às recusas de cover impossível: a tentativa é obrigatória também para dizer que não dá.
+const IMPOSSIBLE_TAIL = ' (impossível também exige a tentativa)'
 const POINTER_TOOLS = ['move', 'click', 'drag']
 
 // Motivo da recusa do cover entre as capturas A e B; null quando aceita. A linha do tempo só tem ações que o driver executou.
-function coverRefusal(state, { item, before, after }) {
+// Impossível aceita imagens iguais: a tentativa é o que prova a impossibilidade.
+function coverRefusal(state, { item, before, after, possible }) {
     if (!state.images.has(before)) return `erro: captura ${before} não existe`
     if (!state.images.has(after)) return `erro: captura ${after} não existe`
     if (state.zoomShots.has(before)) return zoomRefusal(before)
     if (state.zoomShots.has(after)) return zoomRefusal(after)
-    if (state.images.get(before) === state.images.get(after)) return `erro: cover recusado: capturas ${before} e ${after} têm imagens iguais; a ação não mudou a tela`
+    if (possible !== false && state.images.get(before) === state.images.get(after)) return `erro: cover recusado: capturas ${before} e ${after} têm imagens iguais; a ação não mudou a tela`
     const clickOnly = CLICK_ONLY_ITEMS.includes(item)
     const allowed = clickOnly ? ['click'] : POINTER_TOOLS
     const start = state.timeline.findIndex((entry) => entry.kind === 'shot' && entry.shot === before)
@@ -311,13 +317,11 @@ function coverRefusal(state, { item, before, after }) {
 
 function recordCover(state, action) {
     if (!state.coverageItems.includes(action.item)) return { text: `erro: item fora da cobertura: ${action.item}` }
-    if (action.possible === false) {
-        state.covers.set(action.item, { item: action.item, possible: false, seen: action.seen })
-        return { text: 'ok' }
-    }
     const refusal = coverRefusal(state, action)
-    if (refusal) return { text: refusal }
-    state.covers.set(action.item, { item: action.item, before: action.before, after: action.after, seen: action.seen })
+    if (refusal) return { text: action.possible === false ? refusal + IMPOSSIBLE_TAIL : refusal }
+    const cover = { item: action.item, before: action.before, after: action.after, seen: action.seen }
+    if (action.possible === false) cover.possible = false
+    state.covers.set(action.item, cover)
     return { text: 'ok' }
 }
 

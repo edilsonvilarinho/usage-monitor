@@ -102,7 +102,42 @@ test('cover: before e after obrigatórios, antes < depois; possible false dispen
     assert.deepEqual(valid.action, { tool: 'cover', item: 'gear', before: 2, after: 3, seen: 'engrenagem' });
     assert.equal(validateAction('cover', { item: 'gear', before: 3, after: 2, seen: 'engrenagem' }, SCREEN).ok, false);
     assert.equal(validateAction('cover', { item: 'gear', before: 2, seen: 'engrenagem' }, SCREEN).ok, false);
-    assert.equal(validateAction('cover', { item: 'gear', possible: false, seen: 'sem botão' }, SCREEN).ok, true);
+    assert.equal(validateAction('cover', { item: 'gear', possible: false, seen: 'sem botão' }, SCREEN).ok, false);
+});
+
+test('cover impossível exige as mesmas capturas e diz que a tentativa é obrigatória', () => {
+    const refused = validateAction('cover', { item: 'gear', possible: false, seen: 'sem botão' }, SCREEN);
+    assert.equal(refused.ok, false);
+    assert.match(refused.error, /impossível também exige a tentativa/);
+    const accepted = validateAction('cover', { item: 'gear', before: 2, after: 3, possible: false, seen: 'sem botão' }, SCREEN);
+    assert.equal(accepted.ok, true);
+    assert.deepEqual(accepted.action, { tool: 'cover', item: 'gear', before: 2, after: 3, seen: 'sem botão', possible: false });
+});
+
+test('cover impossível sem ação entre as capturas é recusado com o aviso de tentativa', async () => {
+    const client = scripted([
+        reply([call('s2', 'screenshot', {})]),
+        reply([call('m', 'move', { x: 10, y: 10 })]),
+        reply([call('s3', 'screenshot', {})]),
+        reply([call('c', 'cover', { item: 'minimize', before: 2, after: 3, possible: false, seen: 'sem botão' })]),
+        reply([call('d', 'done', { summary: 'fim' })]),
+    ]);
+    const result = await runScript({ client, driver: fakeDriver(), script: 'roteiro', rules: 'regras', screen: SCREEN, budget: createBudget(), coverage: ['minimize'] });
+    assert.match(toolContents(client.calls[4]).at(-1), /ação entre as capturas 2 e 3.*impossível também exige a tentativa/);
+    assert.deepEqual(result.coverage, []);
+});
+
+test('cover impossível aceita imagens iguais quando a tentativa foi feita', async () => {
+    const same = { ...fakeDriver(), async screenshot() { return 'SAME'; } };
+    const client = scripted([
+        reply([call('s2', 'screenshot', {})]),
+        reply([call('m', 'click', { x: 10, y: 10 })]),
+        reply([call('s3', 'screenshot', {})]),
+        reply([call('c', 'cover', { item: 'minimize', before: 2, after: 3, possible: false, seen: 'sem botão' })]),
+        reply([call('d', 'done', { summary: 'fim' })]),
+    ]);
+    const result = await runScript({ client, driver: same, script: 'roteiro', rules: 'regras', screen: SCREEN, budget: createBudget(), coverage: ['minimize'] });
+    assert.deepEqual(result.coverage, [{ item: 'minimize', before: 2, after: 3, seen: 'sem botão', possible: false }]);
 });
 
 test('cover: schema declara before e after, não shot', () => {
