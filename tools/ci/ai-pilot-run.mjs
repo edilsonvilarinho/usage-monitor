@@ -4,7 +4,7 @@ import { execFile, spawn } from 'node:child_process'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { checkKey, createBudget, createOpenRouterClient, confirmReport, runScript, validateAction, MODEL } from './ai-pilot.mjs'
+import { checkKey, createBudget, createOpenRouterClient, confirmReport, runScript, validateAction, LIMITS, MODEL } from './ai-pilot.mjs'
 import { createScreenDriver } from './ai-pilot-driver.mjs'
 
 const REPO = resolve(fileURLToPath(new URL('../..', import.meta.url)))
@@ -24,6 +24,16 @@ const EXIT_USAGE = 2
 const EXIT_REFUSED = 3
 const REFUSED_STOPS = ['key-refused', 'script-budget', 'pilot-budget', 'prompt-limit', 'cost-unknown']
 const ERROR_STOPS = ['driver-error', 'client-error']
+const LEDGER_FILE = join(REPO, 'tools', 'real-app', 'pilot-ledger.json')
+// Chaves de topo do pilot-cases.json que não são casos executáveis.
+const NON_CASE_KEYS = ['script', 'coverage', 'coverageLabels']
+const EPSILON = 1e-9
+
+// Pior caso do lote: gasto já no ledger + jobs x teto do roteiro. Recusa se passa do teto do piloto.
+export function planBudget({ ledgerUsd, jobs, maxScriptUsd, maxPilotUsd }) {
+    const worstCaseUsd = ledgerUsd + jobs * maxScriptUsd
+    return { ok: worstCaseUsd <= maxPilotUsd + EPSILON, worstCaseUsd }
+}
 
 // Argumentos da linha de comando. Opção ausente, valor fora da lista ou flag desconhecida é erro.
 export function parseArgs(argv) {
@@ -61,7 +71,7 @@ export async function runDry({ driver, probe }) {
 }
 
 // Modo paid: a chave é checada antes de qualquer cliente; cada relatório tem seu orçamento de roteiro e no máximo três veredictos.
-export async function runPaid({ fetchKey, makeClient, driver, script, rules, screen, markConfirming = () => {} }) {
+export async function runPaid({ fetchKey, makeClient, driver, script, rules, screen, coverage = [], markConfirming = () => {} }) {
     let keyBody
     try {
         keyBody = await fetchKey()
@@ -72,7 +82,7 @@ export async function runPaid({ fetchKey, makeClient, driver, script, rules, scr
     if (!check.ok) return { stop: 'key-refused', reason: check.reason }
     const client = makeClient()
     const budget = createBudget({ pilotSpentUsd: check.usage })
-    const run = await runScript({ client, driver, script, rules, screen, budget })
+    const run = await runScript({ client, driver, script, rules, screen, budget, coverage })
     const reports = []
     let confirmations = 0
     for (const [index, item] of run.reports.entries()) {
@@ -82,7 +92,7 @@ export async function runPaid({ fetchKey, makeClient, driver, script, rules, scr
             continue
         }
         confirmations += 1
-        budget.startScript()
+        budget.startConversation()
         markConfirming(true)
         const verdict = await confirmReport({ client, report: item, rules, budget })
         markConfirming(false)
@@ -94,6 +104,9 @@ export async function runPaid({ fetchKey, makeClient, driver, script, rules, scr
         costUsd: budget.pilotUsd - check.usage,
         keyUsageBefore: check.usage,
         keyUsageAfter: usageOf(await readKeyAfter(fetchKey)),
+        checks: run.checks,
+        coverage: run.coverage,
+        missing: run.missing,
         reports,
     }
     if (run.detail !== undefined) result.detail = run.detail
@@ -134,7 +147,7 @@ const verdictLabel = (item) => {
 
 // Relatório em português; nunca imprime base64. Resultado de chave recusada não tem passos nem custo: vira zero.
 export function renderReport(input, meta) {
-    const result = { steps: 0, costUsd: 0, reports: [], ...input }
+    const result = { steps: 0, costUsd: 0, reports: [], checks: [], coverage: [], ...input }
     const lines = [
         `# Piloto de IA: ${meta.caseId}`,
         '',
@@ -147,12 +160,18 @@ export function renderReport(input, meta) {
         `- Gasto da chave antes: ${money(result.keyUsageBefore)}`,
         `- Gasto da chave depois: ${money(result.keyUsageAfter)}`,
         '',
-        '## Achados',
+        '## Regras',
         '',
     ]
+    if (result.checks.length === 0) lines.push('Nenhum check registrado.')
+    for (const check of result.checks) lines.push(`- Regra ${cell(check.rule)}: ${cell(check.verdict)} (captura ${cell(check.shot)}): ${cell(check.seen)}`)
+    lines.push('', '## Cobertura', '')
+    const covered = new Set(result.coverage.map((cover) => cover.item))
+    for (const item of meta.coverage ?? []) lines.push(`- ${cell((meta.coverageLabels ?? {})[item] ?? item)}: ${covered.has(item) ? 'coberto' : 'não coberto'}`)
+    lines.push('', '## Achados', '')
     if (result.reports.length === 0) lines.push('Nenhum achado registrado.')
     for (const item of result.reports) {
-        lines.push(`### ${cell(item.title)}`, '', `- Regra: ${cell(item.rule)}`, `- Onde: ${cell(item.where)}`, `- Passo: ${item.step}`, `- Confirmação: ${verdictLabel(item)}`, `- Captura: ${cell(item.shot)}`, '')
+        lines.push(`### ${cell(item.title)}`, '', `- Regra: ${cell(item.rule)}`, `- Lido: ${cell(item.seen)}`, `- Pedido: ${cell(item.expected)}`, `- Confirmação: ${verdictLabel(item)}`, `- Captura: ${cell(item.shot)}`, `- Captura nº ${cell(item.shotNumber)}`, '')
     }
     return lines.join('\n') + '\n'
 }
@@ -213,16 +232,31 @@ async function runMode({ mode, driver, item, env, out, caseId, side, version }) 
     const confirming = { on: false }
     const makeClient = () => recordingClient(createOpenRouterClient({ fetch, apiKey, model: MODEL }), (turn) => turns.push({ ...turn, confirmation: confirming.on }))
     const markConfirming = (on) => { confirming.on = on }
-    const result = await runPaid({ fetchKey, makeClient, driver, script: cases.script, rules, screen, markConfirming })
+    const result = await runPaid({ fetchKey, makeClient, driver, script: cases.script, rules, screen, coverage: cases.coverage ?? [], markConfirming })
     const plan = planEvidence(result)
     await writeEvidence(out, plan.files)
     await writeFile(join(out, 'result.json'), JSON.stringify(plan.result, null, 2))
     await writeFile(join(out, 'transcript.jsonl'), transcriptJsonl(turns))
-    await writeFile(join(out, 'report.md'), renderReport(result, { caseId, side, version }))
+    await writeFile(join(out, 'report.md'), renderReport(result, { caseId, side, version, coverage: cases.coverage, coverageLabels: cases.coverageLabels }))
     return exitCodeOf(result.stop)
 }
 
+// `--plan-budget --jobs n`: confere o pior caso do lote contra o teto do piloto, sem rede e sem driver. Sai 3 se passa do teto.
+async function planMain(argv) {
+    const index = argv.indexOf('--jobs')
+    const jobs = index === -1 ? NaN : Number(argv[index + 1])
+    if (!Number.isInteger(jobs) || jobs < 1) {
+        process.stderr.write('uso: --plan-budget --jobs <inteiro maior que 0>\n')
+        return EXIT_USAGE
+    }
+    const ledger = JSON.parse(await readFile(LEDGER_FILE, 'utf8'))
+    const plan = planBudget({ ledgerUsd: ledger.spentUsd, jobs, maxScriptUsd: LIMITS.maxScriptUsd, maxPilotUsd: LIMITS.maxPilotUsd })
+    process.stdout.write(`pior caso: ${plan.worstCaseUsd.toFixed(4)} USD de ${LIMITS.maxPilotUsd} USD\n`)
+    return plan.ok ? EXIT_OK : EXIT_REFUSED
+}
+
 async function main(argv, env) {
+    if (argv[0] === '--plan-budget') return planMain(argv.slice(1))
     const parsed = parseArgs(argv)
     if (!parsed.ok) {
         process.stderr.write(`${parsed.error}\n`)
@@ -231,7 +265,7 @@ async function main(argv, env) {
     const { mode, caseId, side, exe, dataDir, out } = parsed.options
     const cases = JSON.parse(await readFile(CASES_FILE, 'utf8'))
     const item = cases[caseId]
-    if (caseId === 'script' || !item) {
+    if (NON_CASE_KEYS.includes(caseId) || !item) {
         process.stderr.write(`caso desconhecido: ${caseId}\n`)
         return EXIT_USAGE
     }

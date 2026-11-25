@@ -188,6 +188,25 @@ test('pedido depois de close rejeita sem escrever no filho', async () => {
     assert.equal(child.stdin.written.length, 0);
 });
 
+test('zoom: envia o retangulo e devolve a imagem ampliada', async () => {
+    const child = fakeChild();
+    const driver = createScreenDriver({ child });
+    const pending = driver.zoom({ x: 10, y: 20, w: 300, h: 200 });
+    await settle();
+    assert.deepEqual(requests(child), [{ id: 1, tool: 'zoom', x: 10, y: 20, w: 300, h: 200 }]);
+    reply(child, { id: 1, ok: true, image: 'ZOOM' });
+    assert.equal(await pending, 'ZOOM');
+});
+
+test('zoom sem campo image rejeita', async () => {
+    const child = fakeChild();
+    const driver = createScreenDriver({ child });
+    const pending = driver.zoom({ x: 0, y: 0, w: 16, h: 16 });
+    await settle();
+    reply(child, { id: 1, ok: true });
+    await assert.rejects(pending, /imagem/);
+});
+
 test('ai-pilot-driver.mjs: fonte sem fs, process.env nem child_process', () => {
     const source = readFileSync(MODULE_PATH, 'utf8');
     assert.equal(source.includes('node:fs'), false);
