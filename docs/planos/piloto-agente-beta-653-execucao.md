@@ -60,8 +60,12 @@ O ensaio (run 45645696949, US$ 0,0108) não achou o #474 com o texto na tela, en
    US$ 5. Não depende do `usage` da chave, que ficou em 0 por minutos depois do gasto (causa não confirmada).
 6. **Regra 4** diz o que é data (dia e mês). As outras regras não mudam.
 
+**A04c, depois do 2º ensaio (run 45655899607), ainda antes da medida:** (a) `zoom` não serve de prova: `report` só aceita captura inteira; (b) `cover` exige
+captura antes e depois, com ação do ponteiro entre elas (clique, em minimizar e restaurar); (c) resposta até 2.048 tokens (1.024 cortava chamadas) e US$ 0,20 por job.
+Pior caso: 0,0755 gastos + 2 jobs de ensaio + 18 da medida = US$ 4,08.
+
 **Medida que vale, escrita antes:** #474 fica fora (já foi visto e a regra dele mudou). Valem `gear-balloon`, `balloon-stays` e `thin-bar`, 3 tentativas por lado: 18 jobs,
-no máximo US$ 1,80. Só achado **confirmado** conta. Critério do plano: 70% de acerto e até 20% de alarme falso. Abaixo disso, o piloto termina.
+no máximo US$ 3,60 (US$ 1,80 antes da A04c). Só achado **confirmado** conta. Critério do plano: 70% de acerto e até 20% de alarme falso. Abaixo disso, o piloto termina.
 
 ## Mapa dos casos (A01)
 
@@ -102,6 +106,7 @@ na versão boa é conferido à mão antes de contar como falso.
 | A03c (prova sem IA) | runs 45640121840, 45640638315, 45641283271, 45641901198, 45642448046 e [45642977227](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45642977227) (branch descartável, 8/8 jobs verdes em cada); `node --test "tools/ci/test/*.test.mjs"` | **os 4 casos vistos na tela**, capturas abertas uma a uma: #474 ruim "Reinicia Sáb 12h03" × boa "28/11 12h03"; #596 ruim 80 px, 7 contas sem recolher e engrenagem fora da tela × boa 95 px com 4 minimizadas; #623 ruim não abre o balão da engrenagem (fica o da conta ou nenhum) × boa abre ao lado dela; #631 ruim mantém o balão aberto depois de minimizar × boa fecha. A 1ª rodada mostrou 2 dos 4 casos **inválidos** (fontes com chave somem sem chave): semente com chave falsa. Um erro de leitura de coordenada meu fez o clique errar o botão em 3 rodadas. Ponteiro anda em passos. Vermelho `gear-balloon + move - screenshot` e regra 5; verde 273/273 |
 | A04 (ensaio) | run [45645696949](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45645696949), `main` `b6f694f2`, `reset-date`, 1 por lado | US$ 0,0054 por roteiro. Ruim: 7 passos, 0 achado do caso ("Sáb 12h30" na captura, lido como data). Boa: 6 passos, 2 `report` sem violação. 3 de 3 confirmações rejeitadas. A confirmação recebia só a última captura: defeito do piloto. `usage` da chave 0 antes e depois |
 | A04b | `node --test "tools/ci/test/*.test.mjs"`; script do `plan` extraído do YAML e executado; `Parser::ParseFile` do driver | vermelho: `actual: 0.3, expected: 0.1`; `- captura 2`; `actual: 1, expected: 6`; driver `actual: [], expected: [{ id: 1, tool: 'zoom' …`; contra cópia com stub, `10 !== 0` (custo zerado na confirmação) e `worstCaseUsd`; contra cópias mutadas, `expected: IMG-B, actual: IMG-C` (captura errada na confirmação) e `true !== null` (confirmação acima do teto). Verde 289/289, execução independente; 24 testes do contrato antigo atualizados com igualdade mantida (diff lido). Devolvida 1× (`plan` tratava `coverage` como caso; relatório sem lido/pedido). `plan`: PR = `dry`, 4 casos; pago = 18 jobs, pior caso US$ 1,8108 de 5. `zoom` sem harness: vai no probe do `dry` |
+| A04 (2º ensaio) | run [45655899607](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45655899607), `main` `f6ab10e2`, `reset-date`, 1 por lado (fora da medida) | **achou o #474**: ruim, regra 4 confirmada (24 passos, US$ 0,0454); boa, 0 achados (14 passos, US$ 0,0193). Na ruim, 1 **alarme falso confirmado**: "balão cortado" era a borda do `zoom` (captura 14). Cobertura inventada: `minimize` e `gear` marcados sem clique nem ponteiro sobre eles. 3 respostas bateram no limite de 1.024 tokens. `usage` da chave atualizou com atraso (0 → 0,0108 uma hora depois): confirma que não serve de teto imediato |
 
 ## Problemas em aberto e riscos
 
