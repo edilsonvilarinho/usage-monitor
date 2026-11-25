@@ -18,6 +18,9 @@ const EPSILON = 1e-9
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions'
 
+// Único modelo que o piloto aceita: Haiku 5.5 via OpenRouter (#653).
+export const MODEL = 'anthropic/claude-haiku-5.5'
+
 const KEYS = ['Escape', 'Enter', 'Tab', 'Space', 'Up', 'Down', 'Left', 'Right', 'Home', 'End', 'PageUp', 'PageDown']
 
 const INT = { type: 'integer' }
@@ -40,11 +43,14 @@ export const TOOLS = [
     tool('done', 'Encerra o roteiro com um resumo.', { summary: TEXT }, ['summary']),
 ]
 
-// Ferramenta única do veredito do modelo mais forte (confirmReport).
+// Ferramenta única do veredito do relatório (confirmReport).
 const VERDICT_TOOL = tool('verdict', 'Veredito sobre o achado.', { confirmed: { type: 'boolean' }, why: TEXT }, ['confirmed', 'why'])
 const VERDICT_CHOICE = Object.freeze({ type: 'function', function: { name: 'verdict' } })
 
 const fail = (reason) => ({ ok: false, reason })
+
+// Uso gasto em dólar: número finito >= 0.
+const isSpentUsd = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0
 
 // Confere a resposta de GET /api/v1/key. Ordem fixa das razões.
 export function checkKey(body) {
@@ -54,11 +60,13 @@ export function checkKey(body) {
     if (limit === undefined || (limit !== null && (typeof limit !== 'number' || !Number.isFinite(limit)))) {
         return fail('invalid-response')
     }
-    if (limit === null) return fail('no-limit')
-    if (!Number.isFinite(data.limit_remaining)) return fail('invalid-response')
-    if (limit > 5) return fail('limit-too-high')
-    if (data.limit_remaining < LIMITS.maxScriptUsd) return fail('remaining-too-low')
-    return { ok: true }
+    if (!isSpentUsd(data.usage)) return fail('invalid-response')
+    if (limit !== null) {
+        if (!Number.isFinite(data.limit_remaining)) return fail('invalid-response')
+        if (data.limit_remaining < LIMITS.maxScriptUsd) return fail('remaining-too-low')
+    }
+    if (data.usage + LIMITS.reserveUsd > LIMITS.maxPilotUsd + EPSILON) return fail('pilot-budget')
+    return { ok: true, usage: data.usage }
 }
 
 function isValidUsage(usage) {
@@ -274,7 +282,7 @@ export async function runScript({ client, driver, script, rules, screen, budget 
     }
 }
 
-// Veredito de um relatório com o modelo mais forte. null significa "não medido", nunca falso.
+// Veredito de um relatório com o modelo do piloto. null significa "não medido", nunca falso.
 export async function confirmReport({ client, report, rules, budget }) {
     const blocked = budget.canCall()
     if (blocked) return { confirmed: null, why: blocked }
@@ -312,6 +320,7 @@ function readVerdict(message) {
 
 // Cliente OpenRouter. A chave fica no fechamento, fora de propriedades do objeto.
 export function createOpenRouterClient({ fetch, apiKey, model }) {
+    if (model !== MODEL) throw new Error('modelo não permitido no piloto')
     if (typeof apiKey !== 'string' || apiKey.length === 0) throw new Error('chave de API ausente')
     const redact = (text) => String(text).split(apiKey).join('[redacted]')
     const complete = async ({ messages, tools, maxTokens, toolChoice }) => {

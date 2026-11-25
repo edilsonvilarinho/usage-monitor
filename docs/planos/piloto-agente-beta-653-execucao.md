@@ -9,6 +9,14 @@ identidade `claude <claude@anthropic.com>`. Parte da #644. Este plano cobre só 
 Piloto aprovado com teto de **US$ 5**, pelo OpenRouter, segredo `OPENROUTER_API_KEY` no GitHub. Haiku 5.5 navega; Sonnet 5.5
 confirma só as suspeitas; nada abre issue sozinho.
 
+## Decisões do dono (2026-11-25), que trocam as de cima
+
+- **Chave:** a já configurada, sem limite no OpenRouter, por decisão do dono. O teto fica no código e no `usage` da própria chave: a chave é só do
+  piloto (uso zero em 2026-11-25), então `usage` é o gasto acumulado, e nenhum roteiro começa se `usage` mais a reserva passar de US$ 5.
+- **Modelo:** sempre Haiku 5.5, também na confirmação e na segunda tentativa.
+- **Destino:** o dono analisa o relatório junto. Se valer a pena, o agente passa a criar a issue; a correção segue o workflow. Fora desta atividade.
+- **Aviso ao dono antes do primeiro disparo pago.**
+
 ## Fatos confirmados (2026-11-24)
 
 - `GET https://openrouter.ai/api/v1/models`: `anthropic/claude-haiku-5.5` aceita imagem e ferramentas; US$ 0,10 / 0,50 por
@@ -31,6 +39,9 @@ confirma só as suspeitas; nada abre issue sozinho.
   dado sintético. O agente não recebe o nome do defeito, só o roteiro e as regras escritas.
 - **Critério:** 70% dos casos com defeito apontados e no máximo 20% de alarme falso nas versões boas, 3 rodadas cada. Abaixo
   disso, mesmo piloto com o Sonnet navegando, se couber no teto.
+- **Como se conta, escrito antes da rodada paga (2026-11-25):** acerto = na versão ruim, um achado descreve o problema do caso, do jeito que aparece na captura
+  da prova sem IA (no #596, espessura, estrelas ou botão fora da tela; no #623, balão da engrenagem ausente ou longe). Alarme falso = execução na versão boa
+  com pelo menos um achado que a captura não sustenta. Achado real e desconhecido conta à parte. Quem julga são o Claude e o dono, juntos, sobre as capturas.
 - **Decisões da A02:** `tools/ci/ai-pilot.mjs` não importa nada nem lê ambiente ou disco: cliente e tela entram por injeção. 100 mil
   tokens é o tamanho do **prompt**, não a soma. Resposta sem `usage.cost` bloqueia o piloto inteiro (falha fechada, nunca estimada).
   Ferramentas do turno que esgota o orçamento ainda rodam: já foram pagas. A confirmação pelo Sonnet é um roteiro próprio no orçamento
@@ -60,7 +71,9 @@ na versão boa é conferido à mão antes de contar como falso.
 ## Atividades
 
 - **A01** — plano e mapa dos casos. **A02** — laço, ferramentas e orçamento em TDD, com cliente falso (sem gasto).
-- **A03** — driver de tela no runner e workflow. **A04** — rodada paga e medição. **A05** — relatório e decisão.
+- **A03** — driver de tela no runner e workflow, em três partes: **A03a** `ai-pilot.mjs` (chave sem limite, gasto acumulado, só Haiku) e
+  `ai-pilot-driver.mjs`; **A03b** `screen-driver.ps1` e sementes dos 4 casos; **A03c** `ai-pilot-run.mjs`, catálogo de casos, regras e
+  `ai-pilot.yml`. Prova sem IA (`dry`): cada defeito visto na tela da versão ruim e ausente na boa. **A04** — rodada paga e medição. **A05** — relatório e decisão.
 
 ## Ponto de situação
 
@@ -68,9 +81,13 @@ na versão boa é conferido à mão antes de contar como falso.
 |---|---|---|
 | A01 | catálogo e `/api/v1/key` do OpenRouter; `git tag --contains` por caso | fatos acima; 9 casos, 4 na 1ª rodada. Nenhum foi visto na tela ainda: a A03 confirma que cada defeito aparece no runner antes de gastar |
 | A02 | `node --test tools/ci/test/ai-pilot.test.mjs` | vermelho (stub) 81 de 92, 1ª asserção `actual: { ok: true }, expected: { ok: false, reason: 'invalid-response' }`; verde 92/92. Devolvida 1x (descartava as ferramentas do último turno pago): vermelho `:315 actual: 0, expected: 1`, `:323 actual: 'script-budget', expected: 'done'`, `:333`, `:350` e `:474 actual: { confirmed: true, why: 'ok' }`; verde **95/95**, em execução independente. Nenhuma chamada paga, nenhuma rede. Cobertura do diff: `tools/ci` não é medido por Kover nem pelo lcov do servidor |
+| A03a | `node --test "tools/ci/test/*.test.mjs"` | vermelho (stub): `actual: { ok: false, reason: 'no-limit' }, expected: { ok: true, usage: 1.25 }`; `actual: null, expected: { width: 1920, height: 1080 }`; `actual: [], expected: [ { id: 1, tool: 'screenshot' } ]`; `Missing expected rejection`. Verde 254/254 na pasta (21 novos). Decisões do dono trocaram o contrato: `limit: null` aceito, `limit-too-high` some, `usage` da chave vira o gasto acumulado (`pilot-budget`), e o cliente recusa modelo que não seja `anthropic/claude-haiku-5.5` |
+| A03b | `Parser::ParseFile` nos dois; C# do `Add-Type` compilado sem rodar; `seed.ps1` local nos 4 cenários novos e em `floating-idle` e `docked-top-hole-idle` | sem harness para PowerShell: 0 erros; sementes antigas idênticas às da `main`; chaves de registro de teste removidas. Devolvida 1× (campos `fromX`/`key` fora do contrato de `validateAction`; recolher automático ligado); `PageUp`/`PageDown` corrigidos na conferência. **Falta** rodar no runner (A03c, `dry`) |
+| A03c (código) | `node --test "tools/ci/test/*.test.mjs"`; `yaml.safe_load`; `Parser::ParseFile` dos passos pwsh | vermelho: 5 novos (`actual: [], expected: [ { turn: 1, text: …`; `actual: {}, expected: { stop: …`; `actual: 0, expected: 2`) e os 14 originais contra a cópia com stub (4 de 19 passam); verde 19/19, 273/273 na pasta. Devolvida 1× (pago em qualquer branch e em paralelo; sem transcrição; sem vermelho). Pago só por `workflow_dispatch` na `main`, um por vez; o segredo não chega ao pwsh que controla a tela |
+| A03c (prova sem IA) | runs 45640121840, 45640638315, 45641283271, 45641901198, 45642448046 e [45642977227](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45642977227) (branch descartável, 8/8 jobs verdes em cada); `node --test "tools/ci/test/*.test.mjs"` | **os 4 casos vistos na tela**, capturas abertas uma a uma: #474 ruim "Reinicia Sáb 12h03" × boa "28/11 12h03"; #596 ruim 80 px, 7 contas sem recolher e engrenagem fora da tela × boa 95 px com 4 minimizadas; #623 ruim não abre o balão da engrenagem (fica o da conta ou nenhum) × boa abre ao lado dela; #631 ruim mantém o balão aberto depois de minimizar × boa fecha. A 1ª rodada mostrou 2 dos 4 casos **inválidos** (fontes com chave somem sem chave): semente com chave falsa. Um erro de leitura de coordenada meu fez o clique errar o botão em 3 rodadas. Ponteiro anda em passos. Vermelho `gear-balloon + move - screenshot` e regra 5; verde 273/273 |
 
 ## Problemas em aberto e riscos
 
-- A chave foi colada no chat e fica no histórico local da sessão: trocar depois do piloto.
+- A chave foi colada no chat, não tem limite e o dono decidiu mantê-la: se o código errar a conta, nada no OpenRouter interrompe antes do saldo.
 - Texto na tela do app é dado sintético; o agente não navega na internet, e a rede do app fica bloqueada.
 - Pode não haver 10 casos que atendam à regra da verdade conhecida; o critério é percentual por isso.

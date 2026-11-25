@@ -1,0 +1,187 @@
+# Piloto de IA sobre o app real (#653, 3d). dry captura o probe; paid roda o roteiro com OpenRouter (gasta crédito).
+# paid só por workflow_dispatch em refs/heads/main. PR é sempre dry, todos os casos, 1 tentativa.
+# Runner: tools/ci/ai-pilot-run.mjs. Casos: tools/real-app/pilot-cases.json.
+name: AI pilot
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry só captura o probe; paid roda o roteiro (gasta crédito, só em main)'
+        required: true
+        default: 'dry'
+        type: choice
+        options: [dry, paid]
+      cases:
+        description: "'all' ou ids separados por vírgula de tools/real-app/pilot-cases.json"
+        required: true
+        default: 'all'
+        type: string
+      attempts:
+        description: 'tentativas por caso e lado (1 a 3)'
+        required: true
+        default: '1'
+        type: string
+  pull_request:
+    paths:
+      - 'tools/ci/ai-pilot-run.mjs'
+      - 'tools/ci/ai-pilot.mjs'
+      - 'tools/ci/ai-pilot-driver.mjs'
+      - 'tools/ci/test/ai-pilot-run.test.mjs'
+      - 'tools/real-app/pilot-cases.json'
+      - 'tools/real-app/pilot-rules.md'
+      - 'tools/real-app/seed.ps1'
+      - 'tools/real-app/screen-driver.ps1'
+      - '.github/workflows/ai-pilot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate the request and build the matrix
+        id: plan
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          MODE_IN: ${{ inputs.mode }}
+          CASES_IN: ${{ inputs.cases }}
+          ATTEMPTS_IN: ${{ inputs.attempts }}
+        run: |
+          node <<'JS'
+          const fs = require('node:fs')
+          const fail = (message) => { console.error(message); process.exit(1) }
+          const pullRequest = process.env.EVENT === 'pull_request'
+          const mode = pullRequest ? 'dry' : process.env.MODE_IN
+          if (!['dry', 'paid'].includes(mode)) fail('mode deve ser dry ou paid')
+          if (mode === 'paid' && (process.env.EVENT !== 'workflow_dispatch' || process.env.REF !== 'refs/heads/main')) {
+            fail('paid só roda por workflow_dispatch em refs/heads/main')
+          }
+          const known = Object.keys(JSON.parse(fs.readFileSync('tools/real-app/pilot-cases.json', 'utf8'))).filter((id) => id !== 'script')
+          const raw = pullRequest ? 'all' : (process.env.CASES_IN || 'all').trim()
+          const picked = raw === 'all' ? known : [...new Set(raw.split(',').map((id) => id.trim()))]
+          for (const id of picked) if (!known.includes(id)) fail(`caso desconhecido: ${id}`)
+          const attempts = pullRequest ? 1 : Number(process.env.ATTEMPTS_IN)
+          if (!Number.isInteger(attempts) || attempts < 1 || attempts > 3) fail('attempts deve ser inteiro de 1 a 3')
+          const matrix = { case: picked, side: ['bad', 'good'], attempt: Array.from({ length: attempts }, (_, index) => index + 1) }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `mode=${mode}\nmatrix=${JSON.stringify(matrix)}\n`)
+          JS
+
+  run:
+    needs: plan
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ needs.plan.outputs.mode == 'paid' && 1 || 8 }}
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    concurrency:
+      group: ${{ needs.plan.outputs.mode == 'paid' && 'ai-pilot-paid' || format('ai-pilot-dry-{0}-{1}', github.run_id, strategy.job-index) }}
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CASE: ${{ matrix.case }}
+      SIDE: ${{ matrix.side }}
+      RUN_KEY: ${{ matrix.case }}-${{ matrix.side }}-${{ matrix.attempt }}
+      MODE: ${{ needs.plan.outputs.mode }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Resolve the release tag for the case and side
+        id: tag
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = node -e "const c=require('./tools/real-app/pilot-cases.json')[process.env.CASE]; process.stdout.write(process.env.SIDE==='bad'?c.badTag:c.goodTag)"
+          if ($LASTEXITCODE -ne 0 -or -not $tag) { throw "tag not resolved for $env:CASE/$env:SIDE" }
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Download the published installer
+        shell: pwsh
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = Join-Path $env:RUNNER_TEMP 'installer'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          gh release download $env:TAG --repo $env:GITHUB_REPOSITORY `
+            --pattern "UsageMonitor-Setup-$($env:TAG.TrimStart('v')).exe" --dir $dir
+          if ($LASTEXITCODE -ne 0) { throw "gh release download exit code $LASTEXITCODE" }
+
+      - name: Install silently (per user; NSIS /S does not open the app)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP 'installer') -Filter '*.exe' | Select-Object -First 1
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
+          $exe = Join-Path $env:LOCALAPPDATA 'Usage Monitor\Usage Monitor.exe'
+          if (-not (Test-Path -LiteralPath $exe)) { throw "installed exe not found: $exe" }
+          "APP_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Set data and output paths
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          "DATA_DIR=$(Join-Path $env:RUNNER_TEMP 'ai-pilot-data')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $out = Join-Path (Join-Path $env:GITHUB_WORKSPACE 'out') $env:RUN_KEY
+          "OUT_DIR=$out" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Block outbound network for the app
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-NetFirewallRule -DisplayName 'ai-pilot-653 block outbound' -Direction Outbound `
+            -Program $env:APP_EXE -Action Block -Profile Any | Out-Null
+
+      - name: Run the pilot (the OpenRouter key reaches only a paid run on main)
+        shell: pwsh
+        env:
+          OPENROUTER_API_KEY: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.plan.outputs.mode == 'paid' && secrets.OPENROUTER_API_KEY || '' }}
+        run: |
+          $ErrorActionPreference = 'Continue'
+          node tools/ci/ai-pilot-run.mjs --mode $env:MODE --case $env:CASE --side $env:SIDE `
+            --exe $env:APP_EXE --data-dir $env:DATA_DIR --out $env:OUT_DIR
+          exit $LASTEXITCODE
+
+      - name: Summary and app shutdown
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          Get-Process -Name 'Usage Monitor' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          $report = Join-Path $env:OUT_DIR 'report.md'
+          if (Test-Path -LiteralPath $report) {
+              Get-Content -LiteralPath $report -Raw | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          } else {
+              "### ai-pilot $env:RUN_KEY ($env:MODE): sem report.md" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+
+      - name: Upload the pilot evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ai-pilot-${{ needs.plan.outputs.mode }}-${{ matrix.case }}-${{ matrix.side }}-${{ matrix.attempt }}
+          path: out
+          retention-days: 7
+          if-no-files-found: warn
