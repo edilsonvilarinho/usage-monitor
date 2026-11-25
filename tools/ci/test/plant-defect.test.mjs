@@ -21,6 +21,9 @@ const DEFECT_NAMES = [
     'opens-and-stays',
     'opens-late-and-stays',
     'prewarm-visible',
+    'hud-misplaced',
+    'hud-vanishes',
+    'hud-smaller',
 ]
 // Veredictos que o detector imprime (hud-pulses.mjs); defeito com veredito fora disso nunca dispara.
 const DETECTOR_VERDICTS = [
@@ -36,6 +39,8 @@ const DETECTOR_VERDICTS = [
     'wrong-place',
     'wrong-scene',
     'flash',
+    'vanished',
+    'wrong-box',
 ]
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url))
 const SOURCE_DIR = 'src/desktopMain/kotlin/com/usagemonitor'

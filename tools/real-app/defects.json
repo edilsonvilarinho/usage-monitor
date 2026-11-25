@@ -153,5 +153,53 @@
       "docked-top-hole-idle": "flash",
       "docked-top-hole-hover": "flash"
     }
+  },
+  "hud-misplaced": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+        "find": "WindowPosition(bounds.x * scale, bounds.y * scale)",
+        "replace": "WindowPosition(bounds.x * scale + 40.dp, bounds.y * scale)"
+      }
+    ],
+    "expect": {
+      "docked-top-idle": "wrong-box",
+      "docked-bottom-idle": "wrong-box",
+      "docked-left-idle": "wrong-box",
+      "docked-right-idle": "not-visible",
+      "docked-top-hole-idle": "wrong-box"
+    }
+  },
+  "hud-vanishes": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+        "find": "HudWindowEffects(",
+        "replace": "LaunchedEffect(Unit) { delay(12_000L); window.isVisible = false; delay(3_000L); window.isVisible = true }\n            HudWindowEffects("
+      }
+    ],
+    "expect": {
+      "floating-idle": "vanished",
+      "docked-top-idle": "vanished",
+      "docked-bottom-idle": "vanished",
+      "docked-left-idle": "vanished",
+      "docked-right-idle": "vanished",
+      "docked-top-hole-idle": "vanished"
+    }
+  },
+  "hud-smaller": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudNotchGeometry.kt",
+        "find": "internal val HUD_NOTCH_PADDING_ALONG = 12.dp",
+        "replace": "internal val HUD_NOTCH_PADDING_ALONG = 4.dp"
+      }
+    ],
+    "expect": {
+      "docked-top-idle": "wrong-box",
+      "docked-bottom-idle": "wrong-box",
+      "docked-left-idle": "wrong-box",
+      "docked-right-idle": "wrong-box"
+    }
   }
 }

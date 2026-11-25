@@ -236,3 +236,18 @@ test('CLI --scene: ok com a cena (codigo 0); wrong-size e low-rate com linha mot
     assert.equal(rate.code, 6)
     assert.equal(rate.stdout.split('\n')[0], 'low-rate')
 })
+
+// Gravacao que so aparece depois de 30 s: late-start, logo depois de low-rate. 30 s exatos passam.
+function lateFrames(t0, durationMs = 10000) {
+    const out = []
+    for (let t = 0; t < t0; t += 50) out.push({ tMs: t, foreground: 0, x: 0, y: 0, w: 0, h: 0 })
+    for (let t = t0; t <= t0 + durationMs; t += 50) out.push({ tMs: t, foreground: 1418, x: 481, y: 139, w: 62, h: 42 })
+    return out
+}
+
+test('late-start: t0 acima de 30000 ms e late-start (1); 30000 exatos passam; low-rate vence', () => {
+    const scene = { scene: 'floating-idle', expect: 'default', events: undefined }
+    assert.equal(sceneProblem(lateFrames(30050), scene)?.verdict, 'late-start')
+    assert.notEqual(sceneProblem(lateFrames(30000), scene)?.verdict, 'late-start')
+    assert.equal(sceneProblem(lateFrames(30050, 3000), scene)?.verdict, 'low-rate')
+})

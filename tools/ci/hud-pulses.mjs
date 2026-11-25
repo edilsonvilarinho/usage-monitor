@@ -14,7 +14,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const HEADER = 't_ms,foreground,x,y,w,h'
 const DEFAULTS = { settleMs: 2000, riseRatio: 1.5, minFrames: 2, minForeground: 400, tailMs: 1000 }
-const EXIT = { ok: 0, pulsed: 1, 'open-at-rest': 1, flash: 1, usage: 2, 'not-visible': 4, 'wrong-scene': 5, 'low-rate': 6, vanished: 1, 'startup-pulse': 1, 'wrong-box': 1, 'wrong-size': 1, unstable: 1 }
+const EXIT = { ok: 0, pulsed: 1, 'open-at-rest': 1, flash: 1, usage: 2, 'not-visible': 4, 'wrong-scene': 5, 'low-rate': 6, 'late-start': 1, vanished: 1, 'startup-pulse': 1, 'wrong-box': 1, 'wrong-size': 1, unstable: 1 }
 
 export function parseFrames(csv) {
     const frames = []
@@ -150,6 +150,7 @@ export function sceneProblem(frames, { scene, expect, events }) {
     const t0 = first.tMs
     const after = frames.filter((frame) => frame.tMs > t0)
     return lowRateProblem(after, t0)
+        ?? lateStartProblem(t0)
         ?? vanishedProblem(after)
         ?? startupProblem(frames, startupMax, t0)
         ?? boxProblem(frames, reference, t0)
@@ -176,6 +177,14 @@ function lowRateProblem(after, t0) {
         previous = frame.tMs
     }
     return null
+}
+
+// Primeira aparicao depois de LATE_START_MS da gravacao: real tem no maximo 20,7 s (566 gravacoes).
+const LATE_START_MS = 30000
+
+function lateStartProblem(t0) {
+    if (t0 <= LATE_START_MS) return null
+    return verdictWith('late-start', `primeiro quadro visivel em t=${t0} ms (esperado <= ${LATE_START_MS} ms)`)
 }
 
 function vanishedProblem(after) {
