@@ -234,6 +234,37 @@ class HistoryScreenFormattingTest {
     }
 
     @Test
+    fun `forecast texts in portuguese cover insufficient data and reset before limit`() {
+        assertEquals("Dados insuficientes", forecastLabel(UsageForecast.InsufficientData, PT))
+        assertEquals("A janela deve reiniciar antes do limite", forecastLabel(UsageForecast.ResetsBeforeExhaustion, PT))
+    }
+
+    @Test
+    fun `millions use the M suffix and thousands below them keep K`() {
+        assertEquals("1M", formatQuantity(1_000_000L))
+        assertEquals("2M", formatQuantity(2_000_000L))
+        assertEquals("999K", formatQuantity(999_000L))
+        assertEquals("1K", formatQuantity(1_000L))
+        assertEquals("999", formatQuantity(999L))
+    }
+
+    @Test
+    fun `series subtitles name the window in both languages for every period type`() {
+        assertEquals("Weekly quota", historySeriesDisplaySubtitle(ApiSource.CODEX, series("x", PeriodType.WEEKLY), EN))
+        assertEquals("Quota semanal", historySeriesDisplaySubtitle(ApiSource.CODEX, series("x", PeriodType.WEEKLY), PT))
+        assertEquals("Interval quota", historySeriesDisplaySubtitle(ApiSource.CODEX, series("x", PeriodType.INTERVAL), EN))
+        assertEquals("Quota intervalar", historySeriesDisplaySubtitle(ApiSource.CODEX, series("x", PeriodType.INTERVAL), PT))
+        assertEquals("Monthly quota", historySeriesDisplaySubtitle(ApiSource.CODEX, series("x", PeriodType.MONTHLY), EN))
+        assertEquals("Reported window", historySeriesDisplaySubtitle(ApiSource.CODEX, series("x", PeriodType.REPORTED), EN))
+        assertEquals("Janela reportada", historySeriesDisplaySubtitle(ApiSource.CODEX, series("x", PeriodType.REPORTED), PT))
+    }
+
+    @Test
+    fun `generic history subtitle is literal in portuguese`() {
+        assertEquals("Consumo ao longo do intervalo selecionado", genericHistorySubtitle(PT))
+    }
+
+    @Test
     fun `period comparison is signed and undefined without previous use`() {
         assertEquals("Sem consumo anterior", periodComparisonLabel(UsagePeriodComparison(10L, 0L), PT))
         assertEquals("No previous consumption", periodComparisonLabel(UsagePeriodComparison(10L, 0L), EN))

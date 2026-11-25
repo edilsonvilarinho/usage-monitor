@@ -159,6 +159,121 @@ class UsageAlertMessagesTest {
         assertTrue(usageAlertMessage(spike(factor = 10.0), AppLanguage.PT).body.contains("10,0×"))
     }
 
+    /** Texto inteiro nos dois idiomas: troca de uma palavra só some sem isto. */
+    @Test
+    fun `the spike body is literal in both languages`() {
+        assertEquals(
+            "Anthropic — Padrão · Sessão 5h: hoje está 4,0× acima da mediana dos últimos 3 dias no mesmo horário. " +
+                "Verifique se há automação ou sessão rodando sem supervisão.",
+            usageAlertMessage(spike(), AppLanguage.PT).body
+        )
+        assertEquals(
+            "Anthropic — Padrão · Sessão 5h: today is 4.0× above the median of the last 3 days at the same time of day. " +
+                "Check whether some automation or session is running unattended.",
+            usageAlertMessage(spike(), AppLanguage.EN).body
+        )
+    }
+
+    /** O reinício só entra quando é conhecido; a data sai em BRT e no formato de cada idioma. */
+    @Test
+    fun `the threshold body is literal in both languages with and without a known reset`() {
+        assertEquals(
+            "Uso em 81%, acima do limiar de 75%. Reinício: Sex 30/10 15h30 BRT.",
+            usageAlertMessage(thresholdAlert(75, 81, knownReset = true), AppLanguage.PT).body
+        )
+        assertEquals(
+            "Usage at 81%, above the 75% threshold. Reset: Fri 10/30 15:30 BRT.",
+            usageAlertMessage(thresholdAlert(75, 81, knownReset = true), AppLanguage.EN).body
+        )
+        assertEquals(
+            "Uso em 81%, acima do limiar de 75%.",
+            usageAlertMessage(thresholdAlert(75, 81, knownReset = false), AppLanguage.PT).body
+        )
+        assertEquals(
+            "Usage at 81%, above the 75% threshold.",
+            usageAlertMessage(thresholdAlert(75, 81, knownReset = false), AppLanguage.EN).body
+        )
+    }
+
+    /** Limite dos dois lados: abaixo de 100 é "acima do limiar"; em 100 vira "esgotada". */
+    @Test
+    fun `the threshold turns into exhausted exactly at 100 percent`() {
+        assertEquals(
+            "Uso em 100%, acima do limiar de 99%.",
+            usageAlertMessage(thresholdAlert(99, 100, knownReset = false), AppLanguage.PT).body
+        )
+        assertEquals(
+            "Usage at 100%, above the 99% threshold.",
+            usageAlertMessage(thresholdAlert(99, 100, knownReset = false), AppLanguage.EN).body
+        )
+        assertEquals(
+            "Cota esgotada (100%).",
+            usageAlertMessage(thresholdAlert(100, 100, knownReset = false), AppLanguage.PT).body
+        )
+    }
+
+    @Test
+    fun `the saturated message is literal in both languages with and without project`() {
+        val named = UsageAlert.SessionSaturated(sessionId = "s1", projectName = "usage-monitor")
+        val anonymous = UsageAlert.SessionSaturated(sessionId = "s2", projectName = null)
+
+        assertEquals("Sessão CLI saturada", usageAlertMessage(named, AppLanguage.PT).title)
+        assertEquals("CLI session saturated", usageAlertMessage(named, AppLanguage.EN).title)
+        assertEquals(
+            "A sessão em usage-monitor encheu a janela de contexto. Rode /compact ou comece uma sessão nova.",
+            usageAlertMessage(named, AppLanguage.PT).body
+        )
+        assertEquals(
+            "The session in usage-monitor filled its context window. Run /compact or start a new session.",
+            usageAlertMessage(named, AppLanguage.EN).body
+        )
+        assertEquals(
+            "Uma sessão encheu a janela de contexto. Rode /compact ou comece uma sessão nova.",
+            usageAlertMessage(anonymous, AppLanguage.PT).body
+        )
+        assertEquals(
+            "A session filled its context window. Run /compact or start a new session.",
+            usageAlertMessage(anonymous, AppLanguage.EN).body
+        )
+    }
+
+    /** O título e o corpo do travamento são literais nos dois idiomas; "travou" nunca aparece. */
+    @Test
+    fun `the stalled message is literal in both languages`() {
+        assertEquals("CLI session with no reply", usageAlertMessage(stalled(3.hours.inWholeMilliseconds), AppLanguage.EN).title)
+        assertEquals(
+            "A sessão em usage-monitor está há 3h00 sem resposta desde o último pedido. " +
+                "Verifique se o processo do Claude Code ainda está em execução.",
+            usageAlertMessage(stalled(3.hours.inWholeMilliseconds), AppLanguage.PT).body
+        )
+        assertEquals(
+            "The session in usage-monitor has had no reply for 3h00 since the last request. " +
+                "Check whether the Claude Code process is still running.",
+            usageAlertMessage(stalled(3.hours.inWholeMilliseconds), AppLanguage.EN).body
+        )
+    }
+
+    @Test
+    fun `the stalled message without project names the session in english`() {
+        assertEquals(
+            "A session has had no reply for 1h30 since the last request. " +
+                "Check whether the Claude Code process is still running.",
+            usageAlertMessage(stalled(90.minutes.inWholeMilliseconds, projectName = null), AppLanguage.EN).body
+        )
+    }
+
+    private fun thresholdAlert(threshold: Int, actual: Int, knownReset: Boolean): UsageAlert.QuotaThreshold {
+        return UsageAlert.QuotaThreshold(
+            target = UsageTargetKey.forSource(ApiSource.ANTHROPIC),
+            targetLabel = "Claude",
+            quotaLabel = "Claude 5h",
+            thresholdPercent = threshold,
+            actualPercent = actual,
+            periodEndAt = Instant.parse("2026-10-30T18:30:00Z"),
+            hasKnownResetAt = knownReset
+        )
+    }
+
     private fun spike(factor: Double = 4.0): UsageAlert.SpendSpike {
         return UsageAlert.SpendSpike(
             target = UsageTargetKey(ApiSource.ANTHROPIC, DEFAULT_ANTHROPIC_PROFILE_ID),

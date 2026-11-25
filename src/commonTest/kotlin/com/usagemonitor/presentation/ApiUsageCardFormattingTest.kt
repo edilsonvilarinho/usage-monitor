@@ -7,6 +7,8 @@ import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.expandedQuotaTitle
+import com.usagemonitor.presentation.ui.components.formatBrtDateTime
+import com.usagemonitor.presentation.ui.components.refreshActionLabel
 import com.usagemonitor.presentation.ui.components.formatCents
 import com.usagemonitor.presentation.ui.components.formatCurrencyAmount
 import com.usagemonitor.presentation.ui.components.orderQuotasForCard
@@ -229,5 +231,28 @@ class ApiUsageCardFormattingTest {
         )
 
         assertEquals(true, riskDotTooltipSubtitle(risk, AppLanguage.PT).contains("antes do reset"))
+    }
+
+    @Test
+    fun `refresh action label covers both states in both languages`() {
+        assertEquals("Atualizando", refreshActionLabel(isRefreshing = true, language = AppLanguage.PT))
+        assertEquals("Refreshing", refreshActionLabel(isRefreshing = true, language = AppLanguage.EN))
+        assertEquals("Atualizar", refreshActionLabel(isRefreshing = false, language = AppLanguage.PT))
+        assertEquals("Refresh", refreshActionLabel(isRefreshing = false, language = AppLanguage.EN))
+    }
+
+    /** Dia da semana vem do fuso BRT (UTC-3): 18:00Z é 15h00 em Brasília. */
+    @Test
+    fun `brt date time names the weekday of wednesday thursday and friday in both languages`() {
+        val wednesday = Instant.parse("2026-10-28T18:00:00Z")
+        val thursday = Instant.parse("2026-10-29T18:00:00Z")
+        val friday = Instant.parse("2026-10-30T18:00:00Z")
+
+        assertEquals("Qua 28/10 15h00", formatBrtDateTime(wednesday, AppLanguage.PT))
+        assertEquals("Qui 29/10 15h00", formatBrtDateTime(thursday, AppLanguage.PT))
+        assertEquals("Sex 30/10 15h00", formatBrtDateTime(friday, AppLanguage.PT))
+        assertEquals("Wed 10/28 15:00", formatBrtDateTime(wednesday, AppLanguage.EN))
+        assertEquals("Thu 10/29 15:00", formatBrtDateTime(thursday, AppLanguage.EN))
+        assertEquals("Fri 10/30 15:00", formatBrtDateTime(friday, AppLanguage.EN))
     }
 }
