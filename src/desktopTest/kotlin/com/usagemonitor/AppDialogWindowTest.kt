@@ -15,6 +15,7 @@ import com.usagemonitor.presentation.ui.modalOpenedBreadcrumb
 import com.usagemonitor.presentation.ui.modalPrewarmedBreadcrumb
 import com.usagemonitor.presentation.ui.rememberLastNonNull
 import com.usagemonitor.presentation.ui.shouldAnimateModalWindow
+import com.usagemonitor.presentation.ui.shouldCloakModalWindow
 import com.usagemonitor.presentation.ui.shouldPrewarmModalWindow
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import kotlin.test.Test
@@ -127,5 +128,11 @@ class AppDialogWindowTest {
         subject = "Codex"
         waitForIdle()
         onNodeWithText("Codex").assertExists()
+    }
+
+    /** DWM só existe no Windows: o cloak nunca é pedido em outra plataforma. */
+    @Test
+    fun `cloak is requested only on Windows`() {
+        assertEquals(listOf(Platform.WINDOWS), Platform.values().filter { shouldCloakModalWindow(it) })
     }
 }

@@ -426,6 +426,19 @@ tasks.register<JavaExec>("probeHudAlpha") {
     systemProperty("skiko.renderApi", providers.gradleProperty("hudAlphaProbeRenderApi").orElse("SOFTWARE").get())
 }
 
+// Sonda do flash do pré-aquecimento (#669). Abre janelas na tela: nunca rodar em máquina de dev sem aviso.
+tasks.register<JavaExec>("probePrewarmFlash") {
+    group = "verification"
+    description = "Mede se a janela pré-aquecida pisca na tela entre os ciclos de abertura (#669)."
+    mainClass.set("com.usagemonitor.PrewarmFlashProbe")
+    systemProperty("skiko.renderApi", providers.gradleProperty("prewarmFlashRenderApi").orElse("DIRECT3D").get())
+    classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
+    args(providers.gradleProperty("prewarmFlashCycles").orElse("200").get())
+    args(providers.gradleProperty("prewarmFlashOutputDir").orElse("build/issue669-probe").get())
+    args(providers.gradleProperty("prewarmFlashMode").orElse("prewarm").get())
+    args(providers.gradleProperty("prewarmFlashFirst").orElse("window").get())
+}
+
 tasks.register<JavaExec>("generateScreenshots") {
     group = "documentation"
     description = "Renderiza offscreen os prints do README com dados sinteticos."
