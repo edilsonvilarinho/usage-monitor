@@ -435,7 +435,8 @@ tasks.register<JavaExec>("probePrewarmFlash") {
     classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
     args(providers.gradleProperty("prewarmFlashCycles").orElse("200").get())
     args(providers.gradleProperty("prewarmFlashOutputDir").orElse("build/issue669-probe").get())
-    args(providers.gradleProperty("prewarmFlashControl").orElse("false").get())
+    args(providers.gradleProperty("prewarmFlashMode").orElse("prewarm").get())
+    args(providers.gradleProperty("prewarmFlashFirst").orElse("window").get())
 }
 
 tasks.register<JavaExec>("generateScreenshots") {

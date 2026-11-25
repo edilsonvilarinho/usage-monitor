@@ -46,8 +46,9 @@ import javax.swing.SwingUtilities
 
 /**
  * Sonda do flash do pré-aquecimento (#669). NÃO rodar nesta máquina: abre janelas na tela do dono.
- * Fundo magenta em tela cheia; cada ciclo monta um AppDialogWindow novo, pré-aquecido ou
- * (com control) mostrado por 300 ms. Um amostrador conta os quadros em que o centro saiu do magenta.
+ * Fundo magenta em tela cheia; cada ciclo monta um AppDialogWindow novo. Modos: `prewarm` (pré-aquece e
+ * esconde), `control` (mostra sem pré-aquecer) e `openAfter` (pré-aquece, esconde e mostra depois, contando
+ * flash só até o esconder do pré-aquecimento). Um amostrador conta os quadros em que o centro saiu do magenta.
  */
 object PrewarmFlashProbe {
     private const val TITLE_PREFIX = "QA #669 — ciclo "
@@ -57,6 +58,9 @@ object PrewarmFlashProbe {
     private const val SETTLE_MS = 150L
     private const val CONTROL_VISIBLE_MS = 300L
     private const val STARTUP_MS = 1_200L
+    private const val OPEN_AFTER_GAP_MS = 150L
+    private const val BACKGROUND_WAIT_NANOS = 5_000_000_000L
+    private const val FLASH_MARGIN_NANOS = 150_000_000L
 
     private class WindowMark(val title: String, val shown: Boolean, val nanos: Long)
 
@@ -65,7 +69,10 @@ object PrewarmFlashProbe {
         val overload: PrewarmOverload,
         val shownNanos: Long?,
         val hiddenNanos: Long?,
-        val prewarmMs: Long?
+        val prewarmMs: Long?,
+        val openMs: Long?,
+        val cutNanos: Long?,
+        val samples: List<PrewarmSample>
     ) {
         val completed: Boolean get() = shownNanos != null && hiddenNanos != null
     }
@@ -74,18 +81,25 @@ object PrewarmFlashProbe {
     fun main(args: Array<String>) {
         val cycles = args.getOrNull(0)?.toIntOrNull() ?: 200
         val output = File(args.getOrNull(1) ?: "build/issue669-probe")
-        val control = args.getOrNull(2) == "true"
+        val mode = requireNotNull(PrewarmFlashSamples.modeOf(args.getOrNull(2))) {
+            "prewarmFlashMode desconhecido: ${args.getOrNull(2)}"
+        }
+        val first = requireNotNull(PrewarmFlashSamples.firstOverloadOf(args.getOrNull(3))) {
+            "prewarmFlashFirst desconhecido: ${args.getOrNull(3)}"
+        }
         output.mkdirs()
         val screen = Toolkit.getDefaultToolkit().screenSize
         val marks = ConcurrentLinkedQueue<WindowMark>()
-        val samples = ConcurrentLinkedQueue<PrewarmSample>()
+        val allSamples = ConcurrentLinkedQueue<PrewarmSample>()
+        val currentSamples = AtomicReference(ConcurrentLinkedQueue<PrewarmSample>())
         val running = AtomicBoolean(true)
         val results = CopyOnWriteArrayList<CycleResult>()
         val lastPrewarm = AtomicReference<String?>(null)
-        val breadcrumbs = prewarmRecorder(lastPrewarm)
+        val lastOpened = AtomicReference<String?>(null)
+        val breadcrumbs = prewarmRecorder(lastPrewarm, lastOpened)
         val background = openBackground(screen)
         listenWindowMarks(marks)
-        startSampler(screen, samples, running)
+        startSampler(screen, allSamples, currentSamples, running)
         application {
             var cycle by remember { mutableStateOf(-1) }
             var visible by remember { mutableStateOf(false) }
@@ -106,56 +120,73 @@ object PrewarmFlashProbe {
                     HistoryScreen(vm, AppLanguage.PT, {}, focusedSource = ApiSource.CODEX, showSourceSelector = false)
                 }
                 val position = WindowPosition.Aligned(Alignment.Center)
-                if (overloadOf(cycle) == PrewarmOverload.WINDOW_STATE) {
+                val prewarm = mode != PrewarmFlashMode.CONTROL
+                if (PrewarmFlashSamples.overloadFor(cycle, first) == PrewarmOverload.WINDOW_STATE) {
                     AppDialogWindow(visible = visible, title = title,
                         state = rememberWindowState(size = DpSize(900.dp, 640.dp), position = position),
                         environment = environment, diagnosticName = "sonda flash $cycle",
                         minWidthDp = 320, minHeightDp = 320, onCloseRequest = { visible = false },
-                        openGeneration = cycle, prewarm = !control, content = content)
+                        openGeneration = cycle, prewarm = prewarm, content = content)
                 } else {
                     AppDialogWindow(visible = visible, title = title,
                         state = rememberDialogState(size = DpSize(900.dp, 640.dp), position = position),
                         environment = environment, diagnosticName = "sonda flash $cycle",
                         minWidthDp = 320, minHeightDp = 320, onCloseRequest = { visible = false },
-                        openGeneration = cycle, prewarm = !control, content = content)
+                        openGeneration = cycle, prewarm = prewarm, content = content)
                 }
             }
             LaunchedEffect(Unit) {
                 delay(STARTUP_MS)
                 for (index in 0 until cycles) {
                     val title = TITLE_PREFIX + index
+                    val overload = PrewarmFlashSamples.overloadFor(index, first)
+                    val queue = ConcurrentLinkedQueue<PrewarmSample>()
+                    currentSamples.set(queue)
                     lastPrewarm.set(null)
+                    lastOpened.set(null)
                     cycle = index
-                    if (control) {
+                    if (mode == PrewarmFlashMode.CONTROL) {
                         withFrameNanos { }
                         visible = true
                         delay(CONTROL_VISIBLE_MS)
                         visible = false
                     }
-                    awaitCycle(title, marks)
-                    val message = lastPrewarm.get()
-                    val prewarmMs = if (message == null) null else PrewarmFlashSamples.prewarmMillisOf(message)
-                    results.add(resultOf(index, title, marks, prewarmMs))
+                    awaitCycle(title, marks, hiddenCount = 1)
+                    val prewarmHidden = marks.firstOrNull { it.title == title && !it.shown }?.nanos
+                    if (mode == PrewarmFlashMode.OPEN_AFTER) {
+                        delay(OPEN_AFTER_GAP_MS)
+                        visible = true
+                        delay(CONTROL_VISIBLE_MS)
+                        visible = false
+                        awaitCycle(title, marks, hiddenCount = 2)
+                    }
+                    val shown = marks.firstOrNull { it.title == title && it.shown }?.nanos
+                    val hidden = marks.firstOrNull { it.title == title && !it.shown }?.nanos
+                    val prewarmMessage = lastPrewarm.get()
+                    val prewarmMs = if (prewarmMessage == null) null else PrewarmFlashSamples.prewarmMillisOf(prewarmMessage)
+                    val openedMessage = lastOpened.get()
+                    val openMs = if (openedMessage == null) null else PrewarmFlashSamples.openedMillisOf(openedMessage)
+                    val cut = if (mode == PrewarmFlashMode.OPEN_AFTER) prewarmHidden else null
+                    results.add(CycleResult(index, overload, shown, hidden, prewarmMs, openMs, cut, queue.toList()))
                     delay(SETTLE_MS)
                 }
                 running.set(false)
                 background.dispose()
-                writeReport(output, results.toList(), samples.toList())
+                writeReport(output, results.toList(), allSamples.toList(), mode)
                 exitApplication()
             }
         }
     }
 
-    private fun overloadOf(index: Int): PrewarmOverload =
-        if (index % 2 == 0) PrewarmOverload.WINDOW_STATE else PrewarmOverload.DIALOG_STATE
+    private fun prewarmRecorder(prewarm: AtomicReference<String?>, opened: AtomicReference<String?>): BreadcrumbRecorder =
+        object : BreadcrumbRecorder {
+            override fun record(category: BreadcrumbCategory, message: String) {
+                if (message.contains("pré-aquecida")) prewarm.set(message)
+                if (message.contains("pintada em")) opened.set(message)
+            }
 
-    private fun prewarmRecorder(last: AtomicReference<String?>): BreadcrumbRecorder = object : BreadcrumbRecorder {
-        override fun record(category: BreadcrumbCategory, message: String) {
-            if (message.contains("pré-aquecida")) last.set(message)
+            override fun read(limit: Int): List<Breadcrumb> = emptyList()
         }
-
-        override fun read(limit: Int): List<Breadcrumb> = emptyList()
-    }
 
     /** Fundo magenta sem moldura, não focável, em tela cheia. */
     private fun openBackground(screen: Dimension): JFrame {
@@ -188,21 +219,44 @@ object PrewarmFlashProbe {
         else -> null
     }
 
-    /** Amostrador daemon: o mais rápido possível, um quadrado 24x24 no centro da tela. */
-    private fun startSampler(screen: Dimension, samples: ConcurrentLinkedQueue<PrewarmSample>, running: AtomicBoolean) {
+    /**
+     * Amostrador daemon: o mais rápido possível, um quadrado 24x24 no centro da tela. Só guarda quadros depois
+     * que o fundo magenta aparece (ou esgotam-se 5 s); antes disso a tela ainda não é a referência.
+     */
+    private fun startSampler(
+        screen: Dimension,
+        all: ConcurrentLinkedQueue<PrewarmSample>,
+        current: AtomicReference<ConcurrentLinkedQueue<PrewarmSample>>,
+        running: AtomicBoolean
+    ) {
         val robot = Robot()
         val centre = Rectangle(screen.width / 2 - SAMPLE_SIDE / 2, screen.height / 2 - SAMPLE_SIDE / 2, SAMPLE_SIDE, SAMPLE_SIDE)
         val thread = Thread {
+            if (!awaitBackgroundPainted(robot, centre)) {
+                System.err.println("prewarm-flash: fundo magenta não apareceu em 5 s; amostrando mesmo assim")
+            }
             while (running.get()) {
                 val before = System.nanoTime()
                 val image = robot.createScreenCapture(centre)
                 val after = System.nanoTime()
-                samples.add(PrewarmSample(before, after, isLit(image)))
+                val sample = PrewarmSample(before, after, isLit(image))
+                all.add(sample)
+                current.get().add(sample)
             }
         }
         thread.isDaemon = true
         thread.name = "prewarm-flash-sampler"
         thread.start()
+    }
+
+    /** Espera captura não acesa (fundo magenta pintado) por até 5 s. */
+    private fun awaitBackgroundPainted(robot: Robot, centre: Rectangle): Boolean {
+        val deadline = System.nanoTime() + BACKGROUND_WAIT_NANOS
+        while (System.nanoTime() < deadline) {
+            if (!isLit(robot.createScreenCapture(centre))) return true
+            Thread.sleep(10)
+        }
+        return false
     }
 
     /** Aceso = algum pixel com canal a mais de [LIT_THRESHOLD] do magenta (255, 0, 255). */
@@ -221,30 +275,28 @@ object PrewarmFlashProbe {
         return false
     }
 
-    /** Espera shown e hidden do ciclo; teto de 5 s. Sem os dois, o ciclo conta como tempo esgotado. */
-    private suspend fun awaitCycle(title: String, marks: ConcurrentLinkedQueue<WindowMark>): Boolean =
+    /** Espera shown do ciclo e [hiddenCount] esconderes; teto de 5 s. Sem eles, o ciclo conta como tempo esgotado. */
+    private suspend fun awaitCycle(title: String, marks: ConcurrentLinkedQueue<WindowMark>, hiddenCount: Int): Boolean =
         withTimeoutOrNull(CYCLE_TIMEOUT_MS) {
-            while (marks.none { it.title == title && it.shown } || marks.none { it.title == title && !it.shown }) {
+            while (marks.none { it.title == title && it.shown } ||
+                marks.count { it.title == title && !it.shown } < hiddenCount
+            ) {
                 delay(5)
             }
             true
         } ?: false
 
-    private fun resultOf(index: Int, title: String, marks: ConcurrentLinkedQueue<WindowMark>, prewarmMs: Long?): CycleResult {
-        val shown = marks.firstOrNull { it.title == title && it.shown }?.nanos
-        val hidden = marks.firstOrNull { it.title == title && !it.shown }?.nanos
-        return CycleResult(index, overloadOf(index), shown, hidden, prewarmMs)
-    }
-
-    private fun writeReport(output: File, results: List<CycleResult>, samples: List<PrewarmSample>) {
+    private fun writeReport(output: File, results: List<CycleResult>, allSamples: List<PrewarmSample>, mode: PrewarmFlashMode) {
         val cycles = results.filter { it.completed }.map {
             PrewarmCycle(it.index, it.overload, it.shownNanos!!, it.hiddenNanos!!)
         }
-        val rawFlashes = PrewarmFlashSamples.flashesOf(samples)
+        val kept = results.map { PrewarmFlashSamples.samplesBeforeCut(it.samples, it.cutNanos ?: Long.MAX_VALUE) }
+        val rawFlashes = kept.flatMap { PrewarmFlashSamples.flashesOf(it) }
         val flashes = PrewarmFlashSamples.classify(rawFlashes, cycles, FLASH_MARGIN_NANOS)
         val durations = results.mapNotNull { durationOf(it) }
         val prewarms = results.mapNotNull { it.prewarmMs?.toDouble() }
-        val hz = PrewarmFlashSamples.samplesPerSecond(samples)
+        val opens = results.mapNotNull { it.openMs?.toDouble() }
+        val hz = PrewarmFlashSamples.samplesPerSecond(allSamples)
         val timeouts = results.count { !it.completed }
         val litCycles = flashes.mapNotNull { it.cycle }.distinct().size
         val outsideCycles = flashes.count { it.cycle == null }
@@ -256,9 +308,10 @@ object PrewarmFlashProbe {
         }
         val cycleJson = results.joinToString(",\n    ") { r ->
             "{\"index\": ${r.index}, \"overload\": ${quoted(r.overload.name)}, \"completed\": ${r.completed}, " +
-                "\"durationMs\": ${jsonNumber(durationOf(r))}, \"prewarmMs\": ${r.prewarmMs}}"
+                "\"durationMs\": ${jsonNumber(durationOf(r))}, \"prewarmMs\": ${r.prewarmMs}, \"openMs\": ${r.openMs}}"
         }
         val json = "{\n" +
+            "  \"mode\": ${quoted(mode.name)},\n" +
             "  \"cycles\": ${results.size},\n" +
             "  \"completedCycles\": ${results.size - timeouts},\n" +
             "  \"timeoutCycles\": $timeouts,\n" +
@@ -267,15 +320,15 @@ object PrewarmFlashProbe {
             "  \"samplesPerSecond\": ${jsonNumber(hz)},\n" +
             "  \"durationMs\": {\"median\": ${jsonNumber(PrewarmFlashSamples.median(durations))}, \"p95\": ${jsonNumber(PrewarmFlashSamples.percentile95(durations))}},\n" +
             "  \"prewarmMs\": {\"median\": ${jsonNumber(PrewarmFlashSamples.median(prewarms))}, \"p95\": ${jsonNumber(PrewarmFlashSamples.percentile95(prewarms))}},\n" +
+            "  \"openMs\": {\"median\": ${jsonNumber(PrewarmFlashSamples.median(opens))}, \"p95\": ${jsonNumber(PrewarmFlashSamples.percentile95(opens))}},\n" +
             "  \"flashes\": [\n    $flashJson\n  ],\n" +
             "  \"cycleDetails\": [\n    $cycleJson\n  ]\n" +
             "}\n"
         File(output, "result.json").writeText(json)
-        println("prewarm-flash cycles=${results.size} flashes=${flashes.size} timeouts=$timeouts " +
-            "hz=${String.format(Locale.ROOT, "%.1f", hz)}")
+        val openMedian = PrewarmFlashSamples.median(opens)
+        println("prewarm-flash mode=${mode.name} cycles=${results.size} flashes=${flashes.size} timeouts=$timeouts " +
+            "hz=${String.format(Locale.ROOT, "%.1f", hz)} openMedian=${jsonNumber(openMedian)}")
     }
-
-    private const val FLASH_MARGIN_NANOS = 150_000_000L
 
     private fun durationOf(result: CycleResult): Double? {
         val shown = result.shownNanos ?: return null

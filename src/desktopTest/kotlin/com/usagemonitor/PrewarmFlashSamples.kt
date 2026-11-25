@@ -6,6 +6,9 @@ internal data class PrewarmSample(val startNanos: Long, val endNanos: Long, val 
 /** Os dois jeitos de montar a janela: `WindowState` e `DialogState`. */
 internal enum class PrewarmOverload { WINDOW_STATE, DIALOG_STATE }
 
+/** Modo da sonda: `prewarm` (padrão), `control` (mostra sem pré-aquecer) ou `openAfter` (mostra depois de esconder o pré-aquecimento). */
+internal enum class PrewarmFlashMode { PREWARM, CONTROL, OPEN_AFTER }
+
 /** Um ciclo: instantes do `componentShown` e do `componentHidden`, em nanoTime. */
 internal data class PrewarmCycle(
     val index: Int,
@@ -105,6 +108,35 @@ internal object PrewarmFlashSamples {
     /** Extrai os ms da mensagem do breadcrumb de pré-aquecimento; outra mensagem devolve nulo. */
     fun prewarmMillisOf(message: String): Long? =
         PREWARM_MS_PATTERN.find(message)?.groupValues?.get(1)?.toLongOrNull()
+
+    /** Extrai os ms da abertura medida (primeira abertura); reabertura e outra mensagem devolvem nulo. */
+    fun openedMillisOf(message: String): Long? =
+        Regex("""pintada em (\d+) ms \(primeira abertura\)""").find(message)?.groupValues?.get(1)?.toLongOrNull()
+
+    /** Quadros que começaram antes do corte; usado no modo `openAfter` para ignorar o pré-aquecimento. */
+    fun samplesBeforeCut(samples: List<PrewarmSample>, cutNanos: Long): List<PrewarmSample> =
+        samples.filter { it.startNanos < cutNanos }
+
+    /** Modo a partir da propriedade do Gradle; vazio é padrão; valor desconhecido devolve nulo. */
+    fun modeOf(value: String?): PrewarmFlashMode? = when (value?.trim()) {
+        null, "", "prewarm" -> PrewarmFlashMode.PREWARM
+        "control" -> PrewarmFlashMode.CONTROL
+        "openAfter" -> PrewarmFlashMode.OPEN_AFTER
+        else -> null
+    }
+
+    /** Tipo do ciclo pelo índice, alternando a partir do primeiro. */
+    fun overloadFor(index: Int, first: PrewarmOverload): PrewarmOverload {
+        val second = if (first == PrewarmOverload.WINDOW_STATE) PrewarmOverload.DIALOG_STATE else PrewarmOverload.WINDOW_STATE
+        return if (index % 2 == 0) first else second
+    }
+
+    /** Primeiro tipo a partir da propriedade; vazio é `window`; valor desconhecido devolve nulo. */
+    fun firstOverloadOf(value: String?): PrewarmOverload? = when (value?.trim()) {
+        null, "", "window" -> PrewarmOverload.WINDOW_STATE
+        "dialog" -> PrewarmOverload.DIALOG_STATE
+        else -> null
+    }
 
     /** Ciclo candidato de menor distância ao intervalo não estendido; empate fica com o primeiro. */
     private fun nearestCycle(flash: PrewarmFlash, cycles: List<PrewarmCycle>, marginNanos: Long): PrewarmCycle? {

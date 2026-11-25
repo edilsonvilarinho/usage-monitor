@@ -149,4 +149,53 @@ class PrewarmFlashSamplesTest {
         assertEquals(37L, PrewarmFlashSamples.prewarmMillisOf("janela sonda histórico pré-aquecida em 37 ms"))
         assertNull(PrewarmFlashSamples.prewarmMillisOf("outra mensagem"))
     }
+
+    @Test
+    fun openedMillisComesFromFirstOpenBreadcrumbOnly() {
+        assertEquals(42L, PrewarmFlashSamples.openedMillisOf("janela sonda flash 0 pintada em 42 ms (primeira abertura)"))
+        assertNull(PrewarmFlashSamples.openedMillisOf("janela sonda flash 0 pintada em 42 ms (reabertura)"))
+        assertNull(PrewarmFlashSamples.openedMillisOf("janela sonda flash 0 pré-aquecida em 37 ms"))
+    }
+
+    @Test
+    fun samplesBeforeCutKeepOnlyStartsBeforeCut() {
+        val samples = listOf(sample(0, 10, true), sample(10, 20, true), sample(20, 30, true))
+
+        assertEquals(listOf(samples[0], samples[1]), PrewarmFlashSamples.samplesBeforeCut(samples, 15 * ms))
+    }
+
+    @Test
+    fun cutAtSampleStartDropsItsFlash() {
+        val samples = listOf(sample(0, 10, false), sample(10, 20, true))
+
+        assertEquals(
+            emptyList<PrewarmFlash>(),
+            PrewarmFlashSamples.flashesOf(PrewarmFlashSamples.samplesBeforeCut(samples, 10 * ms))
+        )
+    }
+
+    @Test
+    fun modeFromPropertyValue() {
+        assertEquals(PrewarmFlashMode.PREWARM, PrewarmFlashSamples.modeOf(null))
+        assertEquals(PrewarmFlashMode.PREWARM, PrewarmFlashSamples.modeOf(""))
+        assertEquals(PrewarmFlashMode.PREWARM, PrewarmFlashSamples.modeOf("prewarm"))
+        assertEquals(PrewarmFlashMode.CONTROL, PrewarmFlashSamples.modeOf("control"))
+        assertEquals(PrewarmFlashMode.OPEN_AFTER, PrewarmFlashSamples.modeOf("openAfter"))
+        assertNull(PrewarmFlashSamples.modeOf("bogus"))
+    }
+
+    @Test
+    fun overloadAlternatesByIndexFromFirst() {
+        assertEquals(PrewarmOverload.WINDOW_STATE, PrewarmFlashSamples.overloadFor(0, PrewarmOverload.WINDOW_STATE))
+        assertEquals(PrewarmOverload.DIALOG_STATE, PrewarmFlashSamples.overloadFor(1, PrewarmOverload.WINDOW_STATE))
+        assertEquals(PrewarmOverload.DIALOG_STATE, PrewarmFlashSamples.overloadFor(0, PrewarmOverload.DIALOG_STATE))
+        assertEquals(PrewarmOverload.WINDOW_STATE, PrewarmFlashSamples.overloadFor(3, PrewarmOverload.DIALOG_STATE))
+    }
+
+    @Test
+    fun firstOverloadFromPropertyValue() {
+        assertEquals(PrewarmOverload.WINDOW_STATE, PrewarmFlashSamples.firstOverloadOf(null))
+        assertEquals(PrewarmOverload.DIALOG_STATE, PrewarmFlashSamples.firstOverloadOf("dialog"))
+        assertNull(PrewarmFlashSamples.firstOverloadOf("bogus"))
+    }
 }
