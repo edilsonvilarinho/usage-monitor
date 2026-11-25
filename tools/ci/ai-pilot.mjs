@@ -5,10 +5,10 @@ export const LIMITS = Object.freeze({
     maxSteps: 60,
     maxPromptTokens: 100000,
     promptMargin: 4000,
-    maxScriptUsd: 0.1,
+    maxScriptUsd: 0.2,
     maxPilotUsd: 5,
     reserveUsd: 0.02,
-    maxOutputTokens: 1024,
+    maxOutputTokens: 2048,
     maxWaitMs: 5000,
     maxTypeChars: 200,
 })
@@ -47,7 +47,7 @@ export const TOOLS = [
     tool('key', 'Pressiona uma tecla da lista permitida.', { name: { type: 'string', enum: KEYS } }, ['name']),
     tool('wait', 'Espera em milissegundos.', { ms: INT }, ['ms']),
     tool('check', 'Veredito de uma regra. seen é o texto literal da captura; not_seen dispensa shot.', { rule: RULE, shot: INT, seen: TEXT, verdict: { type: 'string', enum: VERDICTS } }, ['rule', 'seen', 'verdict']),
-    tool('cover', 'Marca um item de cobertura. possible false marca impossível e dispensa shot.', { item: TEXT, shot: INT, seen: TEXT, possible: { type: 'boolean' } }, ['item', 'seen']),
+    tool('cover', 'Marca um item de cobertura com duas capturas inteiras, before < after, e a ação entre elas: click para minimize e restore; move, click ou drag para os demais. possible false marca impossível e dispensa capturas.', { item: TEXT, before: INT, after: INT, seen: TEXT, possible: { type: 'boolean' } }, ['item', 'seen']),
     tool('report', 'Registra um achado de regra com check violated.', { title: TEXT, rule: RULE, shot: INT, seen: TEXT, expected: TEXT }, ['title', 'rule', 'shot', 'seen', 'expected']),
     tool('done', 'Encerra o roteiro com um resumo.', { summary: TEXT }, ['summary']),
 ]
@@ -188,8 +188,10 @@ export function validateAction(name, args, screen) {
             const seen = textOf(input.seen)
             if (!item || !seen) return bad('campo inválido em cover: item e seen não vazios')
             if (input.possible === false) return ok({ tool: 'cover', item, seen, possible: false })
-            if (!isShot(input.shot)) return bad('cover exige shot (número da captura) ou possible false')
-            return ok({ tool: 'cover', item, shot: input.shot, seen })
+            if (!isShot(input.before) || !isShot(input.after) || input.before >= input.after) {
+                return bad('cover exige before e after (números de captura) com before < after, ou possible false')
+            }
+            return ok({ tool: 'cover', item, before: input.before, after: input.after, seen })
         }
         case 'report': {
             const title = textOf(input.title)
@@ -260,23 +262,51 @@ function finish(stop, state, budget, detail) {
     return result
 }
 
-// Guarda a captura com número novo; a primeira, antes do laço, é a 1.
+// Guarda a captura com número novo, na linha do tempo; a primeira, antes do laço, é a 1.
 function recordCapture(state, image) {
     state.nextShot += 1
     state.images.set(state.nextShot, image)
+    state.timeline.push({ kind: 'shot', shot: state.nextShot })
     return state.nextShot
 }
 
-// Resultado da ferramenta de captura: o texto leva o número que o modelo usa em check, cover e report.
-function captureResult(state, image) {
+// Resultado da ferramenta de captura: o texto leva o número que o modelo usa em check, cover e report. Zoom é recorte.
+function captureResult(state, image, zoom = false) {
     const shot = recordCapture(state, image)
-    return { text: `captura ${shot}`, shot }
+    if (!zoom) return { text: `captura ${shot}`, shot }
+    state.zoomShots.add(shot)
+    return { text: `captura ${shot} (recorte: a borda do zoom corta o que fica fora dele; não é prova)`, shot }
 }
+
+// Recorte de zoom não é prova: achado e veredito violated exigem captura inteira.
+const zoomRefusal = (shot) => `erro: captura ${shot} é um recorte de zoom; cite a captura inteira`
 
 function recordCheck(state, action) {
     if (action.shot !== undefined && !state.images.has(action.shot)) return { text: `erro: captura ${action.shot} não existe` }
+    if (action.verdict === 'violated' && state.zoomShots.has(action.shot)) return { text: zoomRefusal(action.shot) }
     state.checks.set(action.rule, { rule: action.rule, verdict: action.verdict, seen: action.seen, shot: action.shot })
     return { text: 'ok' }
+}
+
+// Ações que contam entre as capturas de um cover. minimize e restore pedem clique no botão do balão.
+const CLICK_ONLY_ITEMS = ['minimize', 'restore']
+const POINTER_TOOLS = ['move', 'click', 'drag']
+
+// Motivo da recusa do cover entre as capturas A e B; null quando aceita. A linha do tempo só tem ações que o driver executou.
+function coverRefusal(state, { item, before, after }) {
+    if (!state.images.has(before)) return `erro: captura ${before} não existe`
+    if (!state.images.has(after)) return `erro: captura ${after} não existe`
+    if (state.zoomShots.has(before)) return zoomRefusal(before)
+    if (state.zoomShots.has(after)) return zoomRefusal(after)
+    if (state.images.get(before) === state.images.get(after)) return `erro: cover recusado: capturas ${before} e ${after} têm imagens iguais; a ação não mudou a tela`
+    const clickOnly = CLICK_ONLY_ITEMS.includes(item)
+    const allowed = clickOnly ? ['click'] : POINTER_TOOLS
+    const start = state.timeline.findIndex((entry) => entry.kind === 'shot' && entry.shot === before)
+    const end = state.timeline.findIndex((entry) => entry.kind === 'shot' && entry.shot === after)
+    const between = state.timeline.slice(start + 1, end).filter((entry) => entry.kind === 'action')
+    if (between.some((entry) => allowed.includes(entry.tool))) return null
+    const hint = clickOnly ? 'clique no botão do balão' : 'mover o ponteiro, clicar ou arrastar'
+    return `erro: cover recusado: falta ação entre as capturas ${before} e ${after}; use ${hint}`
 }
 
 function recordCover(state, action) {
@@ -285,8 +315,9 @@ function recordCover(state, action) {
         state.covers.set(action.item, { item: action.item, possible: false, seen: action.seen })
         return { text: 'ok' }
     }
-    if (!state.images.has(action.shot)) return { text: `erro: captura ${action.shot} não existe` }
-    state.covers.set(action.item, { item: action.item, shot: action.shot, seen: action.seen })
+    const refusal = coverRefusal(state, action)
+    if (refusal) return { text: refusal }
+    state.covers.set(action.item, { item: action.item, before: action.before, after: action.after, seen: action.seen })
     return { text: 'ok' }
 }
 
@@ -294,6 +325,7 @@ function recordCover(state, action) {
 function recordReport(state, action) {
     if (state.checks.get(action.rule)?.verdict !== 'violated') return { text: `erro: report da regra ${action.rule} sem check violated` }
     if (!state.images.has(action.shot)) return { text: `erro: captura ${action.shot} não existe` }
+    if (state.zoomShots.has(action.shot)) return { text: zoomRefusal(action.shot) }
     const key = [action.rule, action.title].join('\u0000')
     if (!state.reportKeys.has(key)) {
         state.reportKeys.add(key)
@@ -317,7 +349,7 @@ async function executeTool(action, state, driver) {
         case 'screenshot':
             return captureResult(state, await driver.screenshot())
         case 'zoom':
-            return captureResult(state, await driver.zoom(action))
+            return captureResult(state, await driver.zoom(action), true)
         case 'check':
             return recordCheck(state, action)
         case 'cover':
@@ -326,6 +358,8 @@ async function executeTool(action, state, driver) {
             return recordReport(state, action)
         default:
             await driver.perform(action)
+            // Só entra na linha do tempo depois do driver aceitar: ação rejeitada não conta.
+            state.timeline.push({ kind: 'action', tool: action.tool })
             return { text: 'ok' }
     }
 }
@@ -380,6 +414,8 @@ export async function runScript({ client, driver, script, rules, screen, budget,
         reportedRules: new Set(),
         coverageItems: [...coverage],
         doneRefusals: 0,
+        zoomShots: new Set(),
+        timeline: [],
     }
     let first
     try {

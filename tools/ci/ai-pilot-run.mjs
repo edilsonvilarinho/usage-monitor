@@ -145,6 +145,13 @@ const verdictLabel = (item) => {
     return `não medido: ${item.why}`
 }
 
+// Cobertura em três estados: coberto com as capturas A e B, impossível com o motivo, ou não coberto.
+const coverageLabel = (cover) => {
+    if (!cover) return 'não coberto'
+    if (cover.possible === false) return `impossível: ${cell(cover.seen)}`
+    return `coberto (capturas ${cover.before} → ${cover.after})`
+}
+
 // Relatório em português; nunca imprime base64. Resultado de chave recusada não tem passos nem custo: vira zero.
 export function renderReport(input, meta) {
     const result = { steps: 0, costUsd: 0, reports: [], checks: [], coverage: [], ...input }
@@ -166,8 +173,8 @@ export function renderReport(input, meta) {
     if (result.checks.length === 0) lines.push('Nenhum check registrado.')
     for (const check of result.checks) lines.push(`- Regra ${cell(check.rule)}: ${cell(check.verdict)} (captura ${cell(check.shot)}): ${cell(check.seen)}`)
     lines.push('', '## Cobertura', '')
-    const covered = new Set(result.coverage.map((cover) => cover.item))
-    for (const item of meta.coverage ?? []) lines.push(`- ${cell((meta.coverageLabels ?? {})[item] ?? item)}: ${covered.has(item) ? 'coberto' : 'não coberto'}`)
+    const covers = new Map(result.coverage.map((cover) => [cover.item, cover]))
+    for (const item of meta.coverage ?? []) lines.push(`- ${cell((meta.coverageLabels ?? {})[item] ?? item)}: ${coverageLabel(covers.get(item))}`)
     lines.push('', '## Achados', '')
     if (result.reports.length === 0) lines.push('Nenhum achado registrado.')
     for (const item of result.reports) {

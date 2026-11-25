@@ -181,6 +181,23 @@ test('childEnv tira a chave da OpenRouter do ambiente do filho sem mudar o origi
 
 const rawCases = readFileSync(CASES_PATH, 'utf8');
 const cases = JSON.parse(rawCases);
+test('script manda levar o ponteiro até cada item de cobertura, com captura antes e depois, e clicar para minimizar e restaurar', () => {
+    assert.match(cases.script, /marque cada item de cobertura com cover: leve o ponteiro até cada conta, até a engrenagem e até cada botão das pontas, com uma captura antes e outra depois; para minimizar e restaurar, clique no botão de menos e depois no de mais do balão da conta/);
+});
+
+test('renderReport cobertura: coberto com capturas A → B, impossível com motivo, não coberto', () => {
+    const md = renderReport({
+        steps: 1,
+        costUsd: 0,
+        reports: [],
+        checks: [],
+        coverage: [{ item: 'gear', before: 2, after: 3, seen: 'engrenagem' }, { item: 'minimize', possible: false, seen: 'sem botão' }],
+    }, { caseId: 'c', side: 'lado', version: 'v', coverage: ['gear', 'minimize', 'restore'] });
+    assert.match(md, /^- gear: coberto \(capturas 2 → 3\)$/m);
+    assert.match(md, /^- minimize: impossível: sem botão$/m);
+    assert.match(md, /^- restore: não coberto$/m);
+});
+
 const ids = Object.keys(cases).filter((key) => !['script', 'coverage', 'coverageLabels'].includes(key));
 const seedLine = readFileSync(SEED_PATH, 'utf8').split('\n').find((line) => line.includes('ValidateSet('));
 const SCENARIOS = [...seedLine.matchAll(/'([^']+)'/g)].map((match) => match[1]);
@@ -316,7 +333,7 @@ test('confirmReport via runPaid recebe a imagem do shot do report, não a últim
 test('laço e confirmações juntos não passam de maxScriptUsd: confirmação com orçamento esgotado vira script-budget', async () => {
     const report = call('r', 'report', { title: 'achado caro', rule: 1, shot: 1, seen: 'texto', expected: 'esperado' });
     const violated = call('v', 'check', { rule: 1, shot: 1, seen: 'texto', verdict: 'violated' });
-    const client = fakeClient([reply([violated, report, ...ALL_OK.slice(1), call('d', 'done', { summary: 'ok' })], 0.09)]);
+    const client = fakeClient([reply([violated, report, ...ALL_OK.slice(1), call('d', 'done', { summary: 'ok' })], 0.19)]);
     const result = await runPaid({
         fetchKey: fakeFetchKey(keyBody(0.2), keyBody(0.3)),
         makeClient: () => client,
@@ -325,5 +342,5 @@ test('laço e confirmações juntos não passam de maxScriptUsd: confirmação c
     assert.equal(result.reports[0].confirmed, null);
     assert.equal(result.reports[0].why, 'script-budget');
     assert.equal(client.calls.verdict, 0);
-    assert.ok(result.costUsd <= 0.1 + 1e-9);
+    assert.ok(result.costUsd <= 0.2 + 1e-9);
 });
