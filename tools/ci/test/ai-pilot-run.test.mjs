@@ -191,10 +191,10 @@ test('renderReport cobertura: coberto com capturas A → B, impossível com moti
         costUsd: 0,
         reports: [],
         checks: [],
-        coverage: [{ item: 'gear', before: 2, after: 3, seen: 'engrenagem' }, { item: 'minimize', possible: false, seen: 'sem botão' }],
+        coverage: [{ item: 'gear', before: 2, after: 3, seen: 'engrenagem' }, { item: 'minimize', before: 4, after: 5, possible: false, seen: 'sem botão' }],
     }, { caseId: 'c', side: 'lado', version: 'v', coverage: ['gear', 'minimize', 'restore'] });
     assert.match(md, /^- gear: coberto \(capturas 2 → 3\)$/m);
-    assert.match(md, /^- minimize: impossível: sem botão$/m);
+    assert.match(md, /^- minimize: impossível \(capturas 4 → 5\): sem botão$/m);
     assert.match(md, /^- restore: não coberto$/m);
 });
 

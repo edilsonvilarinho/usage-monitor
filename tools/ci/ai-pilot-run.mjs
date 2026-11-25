@@ -145,10 +145,10 @@ const verdictLabel = (item) => {
     return `não medido: ${item.why}`
 }
 
-// Cobertura em três estados: coberto com as capturas A e B, impossível com o motivo, ou não coberto.
+// Cobertura em três estados: coberto com as capturas A e B, impossível com as capturas A e B e o motivo, ou não coberto.
 const coverageLabel = (cover) => {
     if (!cover) return 'não coberto'
-    if (cover.possible === false) return `impossível: ${cell(cover.seen)}`
+    if (cover.possible === false) return `impossível (capturas ${cover.before} → ${cover.after}): ${cell(cover.seen)}`
     return `coberto (capturas ${cover.before} → ${cover.after})`
 }
 
