@@ -17,6 +17,8 @@ import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.data.diagnostics.AppLogFile
 import com.usagemonitor.data.diagnostics.LocalBreadcrumbRecorder
 import com.usagemonitor.presentation.ui.windowDragSink
+import com.usagemonitor.presentation.ui.preloadWindowCloak
+import com.usagemonitor.presentation.ui.warmUpWindowCloak
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
@@ -405,6 +407,7 @@ internal fun runUsageMonitor(
             return@LaunchedEffect
         }
         delay(SETTINGS_PREWARM_DELAY_MILLIS)
+        preloadWindowCloak(AutoStartManager.currentPlatform(), Dispatchers.IO, ::warmUpWindowCloak)
         settingsPrewarmReady = true
         delay(OTHER_MODALS_PREWARM_DELAY_MILLIS - SETTINGS_PREWARM_DELAY_MILLIS)
         modalPrewarmReady = true
