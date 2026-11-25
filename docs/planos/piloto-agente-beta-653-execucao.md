@@ -64,6 +64,9 @@ O ensaio (run 45645696949, US$ 0,0108) não achou o #474 com o texto na tela, en
 captura antes e depois, com ação do ponteiro entre elas (clique, em minimizar e restaurar); (c) resposta até 2.048 tokens (1.024 cortava chamadas) e US$ 0,20 por job.
 Pior caso: 0,0755 gastos + 2 jobs de ensaio + 18 da medida = US$ 4,08.
 
+**A04d, depois do 3º ensaio (run 45658745827), último ajuste antes da medida:** `possible: false` também exige captura antes e depois com a ação da tentativa; sem isso
+o agente dispensava minimizar e restaurar com "não feito".
+
 **Medida que vale, escrita antes:** #474 fica fora (já foi visto e a regra dele mudou). Valem `gear-balloon`, `balloon-stays` e `thin-bar`, 3 tentativas por lado: 18 jobs,
 no máximo US$ 3,60 (US$ 1,80 antes da A04c). Só achado **confirmado** conta. Critério do plano: 70% de acerto e até 20% de alarme falso. Abaixo disso, o piloto termina.
 
@@ -108,6 +111,7 @@ na versão boa é conferido à mão antes de contar como falso.
 | A04b | `node --test "tools/ci/test/*.test.mjs"`; script do `plan` extraído do YAML e executado; `Parser::ParseFile` do driver | vermelho: `actual: 0.3, expected: 0.1`; `- captura 2`; `actual: 1, expected: 6`; driver `actual: [], expected: [{ id: 1, tool: 'zoom' …`; contra cópia com stub, `10 !== 0` (custo zerado na confirmação) e `worstCaseUsd`; contra cópias mutadas, `expected: IMG-B, actual: IMG-C` (captura errada na confirmação) e `true !== null` (confirmação acima do teto). Verde 289/289, execução independente; 24 testes do contrato antigo atualizados com igualdade mantida (diff lido). Devolvida 1× (`plan` tratava `coverage` como caso; relatório sem lido/pedido). `plan`: PR = `dry`, 4 casos; pago = 18 jobs, pior caso US$ 1,8108 de 5. `zoom` sem harness: vai no probe do `dry` |
 | A04 (2º ensaio) | run [45655899607](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45655899607), `main` `f6ab10e2`, `reset-date`, 1 por lado (fora da medida) | **achou o #474**: ruim, regra 4 confirmada (24 passos, US$ 0,0454); boa, 0 achados (14 passos, US$ 0,0193). Na ruim, 1 **alarme falso confirmado**: "balão cortado" era a borda do `zoom` (captura 14). Cobertura inventada: `minimize` e `gear` marcados sem clique nem ponteiro sobre eles. 3 respostas bateram no limite de 1.024 tokens. `usage` da chave atualizou com atraso (0 → 0,0108 uma hora depois): confirma que não serve de teto imediato |
 | A04c | `node --test "tools/ci/test/*.test.mjs"` | vermelho no código da A04b: `actual: 0.1, expected: 0.2`; `actual: captura 2, expected: captura 2 (recorte…`; `actual: ok, expected: erro: captura 2 é um recorte de zoom`; `actual: [], expected: [ { item: gear, before: 2, after: 3 …`; regex `clique`, `imagens iguais`, `recorte de zoom` e cobertura no relatório não casaram. Verde 300/300, execução independente; testes antigos só mudaram nos valores do contrato |
+| A04 (3º ensaio) | run [45658745827](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45658745827), `main` `404269f4`, `reset-date`, 1 por lado (fora da medida) | ruim: #474 achado e confirmado (regra 4), 11 passos, US$ 0,0143; boa: 0 achados, 14 passos, US$ 0,0206; **0 alarme falso**. Cobertura com capturas e ação reais. Brecha: `minimize` e `restore` como "impossível: não feito", sem tentativa |
 
 ## Problemas em aberto e riscos
 
