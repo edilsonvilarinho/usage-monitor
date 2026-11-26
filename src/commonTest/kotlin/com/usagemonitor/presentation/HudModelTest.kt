@@ -19,6 +19,7 @@ import com.usagemonitor.presentation.ui.hudRingPositionLabel
 import com.usagemonitor.presentation.ui.hudSourceOrigin
 import com.usagemonitor.presentation.ui.hudTraySummary
 import com.usagemonitor.presentation.ui.hudUsedLeft
+import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudUsedLeft
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AccountAccent
@@ -493,6 +494,120 @@ class HudModelTest {
         assertEquals("Semanal", hudQuota.title)
         assertEquals(HudUsedLeft("5% usado", "95% restante"), hudQuota.usedLeft)
     }
+
+    /** Em inglês o forecast ausente diz "No forecast", e a cota continua neutra. */
+    @Test
+    fun `sem projecao em ingles diz no forecast e a cota fica neutra`() {
+        val entries = listOf(entry(CODEX, "Codex 5h", used = 30, risk = null))
+
+        val account = buildHudAccounts(entries, emptyList(), AppLanguage.EN, HUD_NOW).single()
+
+        assertEquals("No forecast", account.statusLabel)
+        assertEquals(AppTone.NEUTRAL, account.quotas.single().tone)
+    }
+
+    /** A fração do anel acompanha o consumo: zero fica zero, e só acima de cem presa em uma volta. */
+    @Test
+    fun `a fracao do anel acompanha o consumo entre zero e uma volta`() {
+        assertEquals(0f, fractionOf(used = 0))
+        assertEquals(0.4f, fractionOf(used = 40))
+        assertEquals(1f, fractionOf(used = 100))
+    }
+
+    /** Foco na quarta cota (fora dos anéis): o pulso cai no anel de fora e nenhuma linha do notch é destacada. */
+    @Test
+    fun `foco na quarta cota pulsa o anel de fora e nao destaca linha`() {
+        val entries = listOf(
+            entry(PADRAO, "Sessão 5h", used = 10, risk = UsageRiskLevel.ON_TRACK),
+            entry(PADRAO, "Sessão 7d", used = 10, risk = UsageRiskLevel.ON_TRACK),
+            entry(PADRAO, "Sessão 30d", used = 10, risk = UsageRiskLevel.ON_TRACK),
+            entry(PADRAO, "Sessão 1d", used = 95, risk = UsageRiskLevel.WILL_EXCEED)
+        )
+
+        val account = buildHudAccounts(entries, emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals(3, account.rings.size)
+        assertEquals(3, account.focusIndex)
+        assertEquals(0, account.attentionRingIndex)
+        assertEquals(null, account.emphasizedStripLineIndex)
+    }
+
+    /** O número em atenção vai para a linha do anel em foco, inclusive a primeira (índice 0). */
+    @Test
+    fun `o numero em atencao e destacado na linha do anel em foco, inclusive a primeira`() {
+        val weeklyFocus = listOf(
+            entry(PADRAO, "Sessão 5h", used = 10, risk = UsageRiskLevel.ON_TRACK, period = PeriodType.INTERVAL),
+            entry(PADRAO, "Sessão 7d", used = 90, risk = UsageRiskLevel.WILL_EXCEED, period = PeriodType.WEEKLY)
+        )
+        val fiveHourFocus = listOf(
+            entry(PADRAO, "Sessão 5h", used = 90, risk = UsageRiskLevel.WILL_EXCEED, period = PeriodType.INTERVAL),
+            entry(PADRAO, "Sessão 7d", used = 10, risk = UsageRiskLevel.ON_TRACK, period = PeriodType.WEEKLY)
+        )
+
+        val sevenDayFocus = buildHudAccounts(weeklyFocus, emptyList(), AppLanguage.PT, HUD_NOW).single()
+        val fiveHourFocusAccount = buildHudAccounts(fiveHourFocus, emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals(0, sevenDayFocus.emphasizedStripLineIndex)
+        assertEquals(1, fiveHourFocusAccount.emphasizedStripLineIndex)
+    }
+
+    /** O Windows corta em 127: exatamente 127 sai inteiro; 128 corta para 127 com reticências. */
+    @Test
+    fun `o resumo da bandeja no limite exato fica inteiro e um caractere a mais corta`() {
+        val exact = hudTraySummary("Usage Monitor", listOf(hudAccountLabeled("A".repeat(111))))
+        assertEquals("Usage Monitor — " + "A".repeat(111), exact)
+        assertEquals(127, exact.length)
+
+        val over = hudTraySummary("Usage Monitor", listOf(hudAccountLabeled("A".repeat(112))))
+        assertEquals("Usage Monitor — " + "A".repeat(110) + "…", over)
+        assertEquals(127, over.length)
+    }
+
+    /** Um por cento exato é "1", e "<1" é só abaixo de um; o restante continua 99. */
+    @Test
+    fun `um por cento exato sai como um e nao como menor que um`() {
+        val one = QuotaInfo("Tokens 7d", used = 1L, total = 100L, periodEndAt = HUD_NOW + 2.hours, unit = UsageUnit.TOKENS)
+
+        assertEquals(HudUsedLeft("1% usado", "99% restante"), hudUsedLeft(one, AppLanguage.PT))
+    }
+
+    /** Consumo acima do teto: o usado não passa de 100% e o restante não fica negativo. */
+    @Test
+    fun `consumo acima do teto nao passa de cem por cento usado`() {
+        val over = QuotaInfo("Tokens 7d", used = 150L, total = 100L, periodEndAt = HUD_NOW + 2.hours, unit = UsageUnit.TOKENS)
+
+        assertEquals(HudUsedLeft("100% usado", "0% restante"), hudUsedLeft(over, AppLanguage.PT))
+        assertEquals(HudUsedLeft("100% used", "0% left"), hudUsedLeft(over, AppLanguage.EN))
+    }
+
+    /** Cada fornecedor tem a sua frase de origem; as que usam chave trocam de idioma. */
+    @Test
+    fun `a origem de cada fornecedor e o texto literal nos dois idiomas`() {
+        assertEquals("via Claude Code", hudSourceOrigin(ApiSource.ANTHROPIC, AppLanguage.PT))
+        assertEquals("via Codex", hudSourceOrigin(ApiSource.CODEX, AppLanguage.EN))
+        assertEquals("via Gemini CLI", hudSourceOrigin(ApiSource.GEMINI, AppLanguage.PT))
+        assertEquals("via Cursor", hudSourceOrigin(ApiSource.CURSOR, AppLanguage.EN))
+        assertEquals("via Kilo Code", hudSourceOrigin(ApiSource.KILO, AppLanguage.PT))
+        assertEquals("via OpenCode", hudSourceOrigin(ApiSource.OPENCODE, AppLanguage.PT))
+        assertEquals("via OpenCode", hudSourceOrigin(ApiSource.OPENCODE, AppLanguage.EN))
+        listOf(ApiSource.MINIMAX, ApiSource.DEEPSEEK, ApiSource.OPENCODE_GO, ApiSource.OPENROUTER).forEach { source ->
+            assertEquals("via chave de API", hudSourceOrigin(source, AppLanguage.PT))
+            assertEquals("via API key", hudSourceOrigin(source, AppLanguage.EN))
+        }
+    }
+
+    private fun fractionOf(used: Int): Float =
+        buildHudAccounts(listOf(entry(CODEX, "Codex 5h", used = used, risk = null)), emptyList(), AppLanguage.PT, HUD_NOW)
+            .single().quotas.single().fraction
+
+    private fun hudAccountLabeled(label: String): HudAccount = HudAccount(
+        targetKey = PADRAO,
+        label = label,
+        statusLabel = "Normal",
+        tone = AppTone.NEUTRAL,
+        quotas = emptyList(),
+        focusIndex = 0
+    )
 
     private fun entry(
         target: UsageTargetKey,

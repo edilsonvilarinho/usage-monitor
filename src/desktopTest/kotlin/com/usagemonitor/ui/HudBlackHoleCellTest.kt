@@ -2,6 +2,7 @@ package com.usagemonitor.ui
 
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -16,13 +17,16 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.hudNotchSizes
 import com.usagemonitor.presentation.ui.HUD_RING_ITEM_TEST_TAG
+import com.usagemonitor.presentation.ui.HUD_STRIP_LINE_TEST_TAG
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudRingStrip
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Buraco negro (#600, A04): as contas minimizadas na lateral viram uma célula só, com a contagem;
@@ -165,6 +169,47 @@ class HudBlackHoleCellTest {
 
         assertEquals(primeiroQuadro, segundoQuadro)
         assertEquals(4, primeiroQuadro.distinct().size)
+    }
+
+    @Test
+    fun `horizontal com contas inteiras mantem cada item na altura do anel de 64 dp`() = runDesktopComposeUiTest {
+        setStrip(fourFull, HudEdge.TOP)
+
+        onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG).assertCountEquals(4)
+        onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG).onFirst().assertHeightIsEqualTo(64.dp)
+        val alturas = onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG).fetchSemanticsNodes().map { no -> no.size.height }
+        assertEquals(1, alturas.distinct().size, "alturas dos 4 itens: $alturas; esperadas todas iguais (64 dp)")
+    }
+
+    @Test
+    fun `horizontal com conta inteira põe o texto a 70 dp do inicio do item, anel de 64 mais vao de 6`() = runDesktopComposeUiTest {
+        setStrip(fourFull, HudEdge.TOP)
+
+        val item = onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG).onFirst().fetchSemanticsNode()
+        val texto = onAllNodesWithTag(HUD_STRIP_LINE_TEST_TAG).onFirst().fetchSemanticsNode()
+        // Densidade 1 neste harness (medido: vao vertical de 12 dp = 12.0 px). Texto a 64 + 6 = 70 px.
+        val deslocamentoPx = texto.positionInRoot.x - item.positionInRoot.x
+        assertTrue(
+            abs(deslocamentoPx - 70f) <= 1f,
+            "texto a ${deslocamentoPx}px do inicio do item; esperado 70.0px (64 dp de anel + 6 dp de vao)"
+        )
+    }
+
+    @Test
+    fun `vertical com quatro contas inteiras alinha as colunas e deixa vao entre elas`() = runDesktopComposeUiTest {
+        setStrip(fourFull, HudEdge.LEFT)
+
+        val nos = onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG).fetchSemanticsNodes()
+        assertEquals(4, nos.size)
+        assertEquals(1, nos.map { no -> no.positionInRoot.x }.distinct().size)
+        val primeiro = nos[0]
+        val segundo = nos[1]
+        val vaoPx = segundo.positionInRoot.y - (primeiro.positionInRoot.y + primeiro.size.height)
+        // Densidade 1 neste harness: 12 dp = 12 px.
+        assertTrue(
+            abs(vaoPx - 12f) <= 1f,
+            "vao entre a 1a e a 2a conta: ${vaoPx}px; esperado 12.0px (12 dp)"
+        )
     }
 
     private fun ComposeUiTest.setStrip(

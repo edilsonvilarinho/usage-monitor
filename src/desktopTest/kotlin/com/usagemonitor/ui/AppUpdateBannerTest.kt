@@ -18,6 +18,8 @@ import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_ACTION_TAG
 import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.AppUpdateBanner
+import com.usagemonitor.presentation.ui.UpdateBannerContent
+import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.updateBannerAction
 import com.usagemonitor.presentation.ui.updateBannerContent
 import com.usagemonitor.presentation.viewmodel.AppUpdateFailureReason
@@ -266,6 +268,313 @@ class AppUpdateBannerTest {
 
         onNodeWithText("Version 38.0.0 is ready — applies when Usage Monitor closes").assertIsDisplayed()
         onNodeWithText("Restart app and update").assertIsDisplayed()
+    }
+
+    /**
+     * Conteúdo inteiro de cada estado, nos dois idiomas, na versão estável: título,
+     * rótulo da ação, tom, cabeçalho e detalhe. O data class compara os cinco campos
+     * de uma vez. O valor é escrito à mão, não lido da produção: trocar um texto,
+     * um tom ou o ramo de um idioma quebra aqui.
+     */
+    @Test
+    fun `stable update has the exact content of every state in both languages`() {
+        assertEquals(
+            UpdateBannerContent(
+                title = "Nova versão 38.0.0 disponível",
+                actionLabel = "Baixar atualização",
+                tone = AppTone.INFO,
+                headline = "Nova versão 38.0.0",
+                detail = "Baixe pela página da versão"
+            ),
+            updateBannerContent(AppUpdateUiState.Available(update), AppLanguage.PT),
+            "PT available"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Version 38.0.0 is available",
+                actionLabel = "Download update",
+                tone = AppTone.INFO,
+                headline = "New version 38.0.0",
+                detail = "Download it from the release page"
+            ),
+            updateBannerContent(AppUpdateUiState.Available(update), AppLanguage.EN),
+            "EN available"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Baixando a versão 38.0.0 — 42%",
+                actionLabel = null,
+                tone = AppTone.INFO,
+                headline = "Baixando 38.0.0",
+                detail = "42% concluído"
+            ),
+            updateBannerContent(AppUpdateUiState.Downloading(update, percent = 42), AppLanguage.PT),
+            "PT downloading 42"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Downloading version 38.0.0 — 42%",
+                actionLabel = null,
+                tone = AppTone.INFO,
+                headline = "Downloading 38.0.0",
+                detail = "42% done"
+            ),
+            updateBannerContent(AppUpdateUiState.Downloading(update, percent = 42), AppLanguage.EN),
+            "EN downloading 42"
+        )
+        // Zero é porcentagem medida, não ausência: não cai no ramo "sem total".
+        assertEquals(
+            UpdateBannerContent(
+                title = "Baixando a versão 38.0.0 — 0%",
+                actionLabel = null,
+                tone = AppTone.INFO,
+                headline = "Baixando 38.0.0",
+                detail = "0% concluído"
+            ),
+            updateBannerContent(AppUpdateUiState.Downloading(update, percent = 0), AppLanguage.PT),
+            "PT downloading 0"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Downloading version 38.0.0 — 0%",
+                actionLabel = null,
+                tone = AppTone.INFO,
+                headline = "Downloading 38.0.0",
+                detail = "0% done"
+            ),
+            updateBannerContent(AppUpdateUiState.Downloading(update, percent = 0), AppLanguage.EN),
+            "EN downloading 0"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Baixando a versão 38.0.0…",
+                actionLabel = null,
+                tone = AppTone.INFO,
+                headline = "Baixando 38.0.0",
+                detail = "Em segundo plano"
+            ),
+            updateBannerContent(AppUpdateUiState.Downloading(update, percent = null), AppLanguage.PT),
+            "PT downloading null"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Downloading version 38.0.0…",
+                actionLabel = null,
+                tone = AppTone.INFO,
+                headline = "Downloading 38.0.0",
+                detail = "In the background"
+            ),
+            updateBannerContent(AppUpdateUiState.Downloading(update, percent = null), AppLanguage.EN),
+            "EN downloading null"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Versão 38.0.0 pronta — será aplicada ao fechar o Usage Monitor",
+                actionLabel = "Reiniciar o app e atualizar",
+                tone = AppTone.OK,
+                headline = "Versão 38.0.0 pronta",
+                detail = "Aplicada ao fechar o Usage Monitor"
+            ),
+            updateBannerContent(AppUpdateUiState.Downloaded(update), AppLanguage.PT),
+            "PT downloaded"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Version 38.0.0 is ready — applies when Usage Monitor closes",
+                actionLabel = "Restart app and update",
+                tone = AppTone.OK,
+                headline = "Version 38.0.0 ready",
+                detail = "Applies when Usage Monitor closes"
+            ),
+            updateBannerContent(AppUpdateUiState.Downloaded(update), AppLanguage.EN),
+            "EN downloaded"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Falha ao baixar a versão 38.0.0",
+                actionLabel = "Baixar manualmente",
+                tone = AppTone.WARNING,
+                headline = "Falha na versão 38.0.0",
+                detail = "O download não terminou"
+            ),
+            updateBannerContent(AppUpdateUiState.Failed(update, AppUpdateFailureReason.DOWNLOAD), AppLanguage.PT),
+            "PT failed download"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Could not download version 38.0.0",
+                actionLabel = "Download manually",
+                tone = AppTone.WARNING,
+                headline = "Version 38.0.0 failed",
+                detail = "The download did not finish"
+            ),
+            updateBannerContent(AppUpdateUiState.Failed(update, AppUpdateFailureReason.DOWNLOAD), AppLanguage.EN),
+            "EN failed download"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Falha ao iniciar a instalação da versão 38.0.0",
+                actionLabel = "Baixar manualmente",
+                tone = AppTone.WARNING,
+                headline = "Falha na versão 38.0.0",
+                detail = "A instalação não iniciou"
+            ),
+            updateBannerContent(AppUpdateUiState.Failed(update, AppUpdateFailureReason.SCHEDULE), AppLanguage.PT),
+            "PT failed schedule"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Could not start the version 38.0.0 install",
+                actionLabel = "Download manually",
+                tone = AppTone.WARNING,
+                headline = "Version 38.0.0 failed",
+                detail = "The install did not start"
+            ),
+            updateBannerContent(AppUpdateUiState.Failed(update, AppUpdateFailureReason.SCHEDULE), AppLanguage.EN),
+            "EN failed schedule"
+        )
+    }
+
+    /**
+     * Beta: o cabeçalho diz "beta" em todo estado (issue #355) e o número desce
+     * para o detalhe, com " · " antes do texto do estável. Os dois idiomas e os
+     * dois motivos de falha, com valor literal.
+     */
+    @Test
+    fun `beta update has the exact content of every state in both languages`() {
+        val beta = AppUpdateInfo(version = "39.0.0-beta.1", releasePageUrl = "https://example.com")
+        assertEquals(
+            UpdateBannerContent(
+                title = "Nova versão beta 39.0.0-beta.1 disponível",
+                actionLabel = "Baixar atualização",
+                tone = AppTone.INFO,
+                headline = "Nova versão beta",
+                detail = "39.0.0-beta.1 · Baixe pela página da versão"
+            ),
+            updateBannerContent(AppUpdateUiState.Available(beta), AppLanguage.PT),
+            "PT beta available"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Beta version 39.0.0-beta.1 is available",
+                actionLabel = "Download update",
+                tone = AppTone.INFO,
+                headline = "New beta version",
+                detail = "39.0.0-beta.1 · Download it from the release page"
+            ),
+            updateBannerContent(AppUpdateUiState.Available(beta), AppLanguage.EN),
+            "EN beta available"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Baixando a versão beta 39.0.0-beta.1 — 42%",
+                actionLabel = null,
+                tone = AppTone.INFO,
+                headline = "Baixando a beta",
+                detail = "39.0.0-beta.1 · 42% concluído"
+            ),
+            updateBannerContent(AppUpdateUiState.Downloading(beta, percent = 42), AppLanguage.PT),
+            "PT beta downloading 42"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Downloading beta version 39.0.0-beta.1 — 42%",
+                actionLabel = null,
+                tone = AppTone.INFO,
+                headline = "Downloading beta",
+                detail = "39.0.0-beta.1 · 42% done"
+            ),
+            updateBannerContent(AppUpdateUiState.Downloading(beta, percent = 42), AppLanguage.EN),
+            "EN beta downloading 42"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Baixando a versão beta 39.0.0-beta.1…",
+                actionLabel = null,
+                tone = AppTone.INFO,
+                headline = "Baixando a beta",
+                detail = "39.0.0-beta.1 · Em segundo plano"
+            ),
+            updateBannerContent(AppUpdateUiState.Downloading(beta, percent = null), AppLanguage.PT),
+            "PT beta downloading null"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Downloading beta version 39.0.0-beta.1…",
+                actionLabel = null,
+                tone = AppTone.INFO,
+                headline = "Downloading beta",
+                detail = "39.0.0-beta.1 · In the background"
+            ),
+            updateBannerContent(AppUpdateUiState.Downloading(beta, percent = null), AppLanguage.EN),
+            "EN beta downloading null"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Versão beta 39.0.0-beta.1 pronta — será aplicada ao fechar o Usage Monitor",
+                actionLabel = "Reiniciar o app e atualizar",
+                tone = AppTone.OK,
+                headline = "Beta pronta",
+                detail = "39.0.0-beta.1 · Aplicada ao fechar o Usage Monitor"
+            ),
+            updateBannerContent(AppUpdateUiState.Downloaded(beta), AppLanguage.PT),
+            "PT beta downloaded"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Beta version 39.0.0-beta.1 is ready — applies when Usage Monitor closes",
+                actionLabel = "Restart app and update",
+                tone = AppTone.OK,
+                headline = "Beta ready",
+                detail = "39.0.0-beta.1 · Applies when Usage Monitor closes"
+            ),
+            updateBannerContent(AppUpdateUiState.Downloaded(beta), AppLanguage.EN),
+            "EN beta downloaded"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Falha ao baixar a versão beta 39.0.0-beta.1",
+                actionLabel = "Baixar manualmente",
+                tone = AppTone.WARNING,
+                headline = "Falha na beta",
+                detail = "39.0.0-beta.1 · O download não terminou"
+            ),
+            updateBannerContent(AppUpdateUiState.Failed(beta, AppUpdateFailureReason.DOWNLOAD), AppLanguage.PT),
+            "PT beta failed download"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Could not download beta version 39.0.0-beta.1",
+                actionLabel = "Download manually",
+                tone = AppTone.WARNING,
+                headline = "Beta failed",
+                detail = "39.0.0-beta.1 · The download did not finish"
+            ),
+            updateBannerContent(AppUpdateUiState.Failed(beta, AppUpdateFailureReason.DOWNLOAD), AppLanguage.EN),
+            "EN beta failed download"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Falha ao iniciar a instalação da versão beta 39.0.0-beta.1",
+                actionLabel = "Baixar manualmente",
+                tone = AppTone.WARNING,
+                headline = "Falha na beta",
+                detail = "39.0.0-beta.1 · A instalação não iniciou"
+            ),
+            updateBannerContent(AppUpdateUiState.Failed(beta, AppUpdateFailureReason.SCHEDULE), AppLanguage.PT),
+            "PT beta failed schedule"
+        )
+        assertEquals(
+            UpdateBannerContent(
+                title = "Could not start the beta version 39.0.0-beta.1 install",
+                actionLabel = "Download manually",
+                tone = AppTone.WARNING,
+                headline = "Beta failed",
+                detail = "39.0.0-beta.1 · The install did not start"
+            ),
+            updateBannerContent(AppUpdateUiState.Failed(beta, AppUpdateFailureReason.SCHEDULE), AppLanguage.EN),
+            "EN beta failed schedule"
+        )
     }
 
     private fun androidx.compose.ui.test.ComposeUiTest.showBanner(

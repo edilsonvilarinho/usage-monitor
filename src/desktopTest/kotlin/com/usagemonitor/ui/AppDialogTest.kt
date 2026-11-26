@@ -1,15 +1,21 @@
 package com.usagemonitor.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.components.APP_DIALOG_SCRIM_TAG
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
@@ -19,6 +25,9 @@ import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+
+/** Etiqueta da sonda de largura: um `fillMaxWidth` dentro do corpo mede o quanto o cartão dá a ele. */
+private const val APP_DIALOG_WIDTH_PROBE_TAG = "app_dialog_width_probe"
 
 @OptIn(ExperimentalTestApi::class)
 class AppDialogTest {
@@ -81,6 +90,29 @@ class AppDialogTest {
         // O canto do fundo: o centro dele é justamente onde o cartão está.
         onNodeWithTag(APP_DIALOG_SCRIM_TAG).performTouchInput { click(Offset(4f, 4f)) }
         assertEquals(1, dismissals)
+    }
+
+    /**
+     * Cartão de 528 dp: teto de 560 menos o padding de 16 dos dois lados. A sonda ocupa
+     * a largura inteira do corpo, então mede o teto que o cartão entrega ao conteúdo.
+     */
+    @Test
+    fun `the card gives its content 528 dp, the 560 dp maximum less its padding`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme {
+                AppDialog(
+                    onDismissRequest = {},
+                    text = {
+                        Box(Modifier.fillMaxWidth().testTag(APP_DIALOG_WIDTH_PROBE_TAG)) {
+                            Text("Corpo do diálogo")
+                        }
+                    },
+                    confirmButton = { AppButton(label = "Ok", onClick = {}) }
+                )
+            }
+        }
+
+        onNodeWithTag(APP_DIALOG_WIDTH_PROBE_TAG).assertWidthIsEqualTo(528.dp)
     }
 
     @Test

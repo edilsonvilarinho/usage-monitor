@@ -57,6 +57,16 @@ class ModalWindowsDecisionsTest {
         assertEquals(weekEnd, anthropic("work", listOf(unknownReset, weekly)).quotaEndAt(PeriodType.WEEKLY))
     }
 
+    /** Duas janelas do mesmo tipo com reset conhecido: o fim é o da primeira, e um irmão de reset desconhecido não muda isso. */
+    @Test
+    fun `the first known reset of the asked period gives the window end`() {
+        val later = fiveHour.copy(label = "5h depois", periodEndAt = Instant.parse("2026-10-28T22:00:00Z"))
+        val unknownFirst = fiveHour.copy(hasKnownResetAt = false, periodEndAt = Instant.parse("2026-10-28T09:00:00Z"))
+
+        assertEquals(fiveHourEnd, anthropic("work", listOf(fiveHour, later)).quotaEndAt(PeriodType.INTERVAL))
+        assertEquals(fiveHourEnd, anthropic("work", listOf(unknownFirst, fiveHour, later)).quotaEndAt(PeriodType.INTERVAL))
+    }
+
     @Test
     fun `the credits come in the account's real currency, minor units first`() {
         val credits = QuotaInfo(
@@ -92,6 +102,55 @@ class ModalWindowsDecisionsTest {
         assertNull(accountCreditsForProfile(state, "home"))
         assertNull(accountCreditsForProfile(state, null))
         assertNull(accountCreditsForProfile(UiState.NoApisEnabled, "work"))
+    }
+
+    /** Só a conta Anthropic do perfil pedido tem créditos: nem outra conta, nem outra fonte com o mesmo perfil. */
+    @Test
+    fun `the credits come only from the Anthropic account of the asked profile`() {
+        val credits = QuotaInfo(
+            AnthropicQuotaLabels.EXTRA_CREDITS,
+            used = 12,
+            total = 50,
+            periodEndAt = weekEnd,
+            unit = UsageUnit.CURRENCY_USD,
+            currencyCode = "BRL"
+        )
+        val home = anthropic("home", listOf(credits))
+        val work = anthropic("work", listOf(fiveHour))
+        val miniMaxWork = ApiUsageStats(
+            source = ApiSource.CODEX,
+            targetKey = UsageTargetKey(ApiSource.CODEX, "work"),
+            apiName = "Codex",
+            quotas = listOf(credits)
+        )
+
+        assertEquals(
+            AccountCreditUsage(usedMinorUnits = 12, limitMinorUnits = 50, currencyCode = "BRL"),
+            accountCreditsForProfile(UiState.Success(listOf(home, work)), "home")
+        )
+        assertNull(accountCreditsForProfile(UiState.Success(listOf(home, work)), "work"))
+        assertNull(accountCreditsForProfile(UiState.Success(listOf(miniMaxWork, work)), "work"))
+    }
+
+    /** Duas cotas de créditos na mesma conta: vale a primeira da leitura. */
+    @Test
+    fun `the first credits quota of the account wins over a repeated one`() {
+        val first = QuotaInfo(
+            AnthropicQuotaLabels.EXTRA_CREDITS,
+            used = 1,
+            total = 10,
+            periodEndAt = weekEnd,
+            unit = UsageUnit.CURRENCY_USD,
+            rawUsed = 100,
+            rawTotal = 1_000,
+            currencyCode = "USD"
+        )
+        val repeated = first.copy(rawUsed = 900, rawTotal = 9_000)
+
+        assertEquals(
+            AccountCreditUsage(usedMinorUnits = 100, limitMinorUnits = 1_000, currencyCode = "USD"),
+            accountCreditsForProfile(UiState.Success(listOf(anthropic("work", listOf(first, repeated)))), "work")
+        )
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.usagemonitor
 
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.DpRect
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
@@ -590,10 +591,11 @@ class HudNotchGeometryTest {
     @Test
     fun `a janela mede quem esta saindo e o notch recolhe sem ele`() {
         val staying = account("Fica", "Normal", listOf("5h" to "10%"))
-        val leaving = account("Sai", "Normal", listOf("5h" to "20%")).copy(presence = HudPresence.LEAVING)
+        val leaving = account("Sai", "Sem projeção", listOf("5h" to "100%")).copy(presence = HudPresence.LEAVING)
 
         val (window, after) = hudWindowSizes(listOf(staying, leaving), HudPlacement(HudEdge.TOP, 0.5f), screen, 1f, "", false, false)
 
+        assertEquals(hudNotchSizes(listOf(staying), HudEdge.TOP, "", false).collapsed.width, after.collapsed.width)
         assertTrue(after.collapsed.width < window.collapsed.width)
     }
 
@@ -640,6 +642,49 @@ class HudNotchGeometryTest {
         assertEquals(expectedHeight, sizes.collapsed.height)
     }
 
+    @Test
+    fun `banner de sinais de sessao mede titulo numa linha e 17 dp por sinal`() {
+        assertEquals(49.dp, hudSessionBannerHeight(1))
+        assertEquals(66.dp, hudSessionBannerHeight(2))
+    }
+
+    @Test
+    fun `banner de atualizacao do balao da engrenagem tem duas linhas de detalhe de 17 dp`() {
+        assertEquals(66.dp, HUD_APP_BALLOON_UPDATE_BANNER)
+    }
+
+    @Test
+    fun `pilula soma a folga de cima e de baixo uma vez, com 14 dp por linha de palavra`() {
+        assertEquals(18.dp, statusPillHeight(1))
+        assertEquals(32.dp, statusPillHeight(2))
+    }
+
+    @Test
+    fun `linha de detalhe do balao soma 24 dp, separador mais rodape`() {
+        val semDetalhe = account("Claude", "Em dia", listOf("5h" to "40%"))
+        val comDetalhe = semDetalhe.copy(planLabel = "Plus")
+
+        assertEquals(24.dp, hudBalloonHeight(comDetalhe) - hudBalloonHeight(semDetalhe))
+    }
+
+    @Test
+    fun `palavra com espaco na coluna vertical mede a linha mais longa, 8 caracteres, 55 dp`() {
+        assertEquals(2, verticalWordLines("Sem projeção"))
+        assertEquals(55.dp, verticalWordLineWidth("Sem projeção"))
+    }
+
+    @Test
+    fun `area sem medida positiva ou com centro nao finito devolve a posicao de estreia`() {
+        val zero = ScreenWorkArea(x = 0.dp, y = 0.dp, size = DpSize(0.dp, 0.dp))
+        val semLargura = ScreenWorkArea(x = 0.dp, y = 0.dp, size = DpSize(0.dp, 1080.dp))
+        val semAltura = ScreenWorkArea(x = 0.dp, y = 0.dp, size = DpSize(1920.dp, 0.dp))
+
+        assertEquals(HudPlacement.Default, nearestHudPlacement(100.dp, 100.dp, zero))
+        assertEquals(HudPlacement.Default, nearestHudPlacement(100.dp, 100.dp, semLargura))
+        assertEquals(HudPlacement.Default, nearestHudPlacement(100.dp, 100.dp, semAltura))
+        assertEquals(HudPlacement.Default, nearestHudPlacement(Float.NaN.dp, 100.dp, screen))
+    }
+
     private fun account(label: String, word: String, quotas: List<Pair<String, String>>): HudAccount {
         return HudAccount(
             targetKey = UsageTargetKey(ApiSource.ANTHROPIC, label),
@@ -650,6 +695,20 @@ class HudNotchGeometryTest {
                 HudQuota(short, percent, 0.5f, AppTone.OK, resetText = null, hasForecast = true)
             },
             focusIndex = 0
+        )
+    }
+
+    /** Notch encostado na borda esquerda: a parada começa em 0 dp e vai até o notch mais a margem de 16 dp (L566). */
+    @Test
+    fun `parada com o notch encostado na borda leva a margem exata do lado de la`() {
+        val accounts = listOf(account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%")))
+        val sizes = hudNotchSizes(accounts, HudEdge.TOP, "", false)
+        val window = HudWindowBounds(0.dp, 0.dp, DpSize(1000.dp, 200.dp), notchCenterInWindow = sizes.collapsed.width / 2)
+        val region = hudRestHitRegion(HudEdge.TOP, window, sizes)
+        assertEquals(
+            DpRect(0.dp, 0.dp, sizes.collapsed.width + 16.dp, sizes.collapsed.height + 16.dp),
+            region,
+            "notch encostado na borda esquerda"
         )
     }
 }

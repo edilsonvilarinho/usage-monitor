@@ -121,6 +121,7 @@ import com.usagemonitor.presentation.ui.HUD_STARFIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_GEAR_HINT_UPDATE_TAG
 import com.usagemonitor.presentation.ui.HUD_GEAR_UPDATE_DOT_TAG
 import com.usagemonitor.presentation.ui.HudAccount
+import com.usagemonitor.presentation.ui.hudRefreshAccountLabel
 import com.usagemonitor.presentation.ui.HudNotch
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudPresence
@@ -2027,6 +2028,115 @@ class HudNotchTest {
         onNodeWithText("2 disponíveis").assertIsDisplayed()
     }
 
+    /**
+     * A barra de progresso da cota aparece no balão: só a fração muda entre as duas
+     * capturas, então pixels iguais significam barra ausente (furo L454, sem tag).
+     */
+    @Test
+    fun `a barra de progresso da cota no balao muda de desenho com a fracao`() {
+        val low = balloonPixelsWithFraction(0.2f)
+        val high = balloonPixelsWithFraction(0.9f)
+
+        val differing = low.countPixelsDifferingFrom(high)
+        assertTrue(differing > 0, "Barra de progresso sem efeito: 0 pixels diferem entre fracao 0.2 e 0.9")
+    }
+
+    private fun balloonPixelsWithFraction(fraction: Float): PixelMap {
+        val base = accounts.first()
+        val shown = base.copy(quotas = base.quotas.map { quota -> quota.copy(fraction = fraction) })
+        var pixels: PixelMap? = null
+        runDesktopComposeUiTest {
+            setContent {
+                AppTheme(isDark = true) {
+                    Box(modifier = Modifier.width(HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2)) {
+                        HudAccountBalloonContent(account = shown, language = AppLanguage.PT)
+                    }
+                }
+            }
+            pixels = onRoot().captureToImage().toPixelMap()
+        }
+        return checkNotNull(pixels)
+    }
+
+    private fun PixelMap.countPixelsDifferingFrom(other: PixelMap): Int {
+        var count = 0
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                if (this[x, y] != other[x, y]) {
+                    count += 1
+                }
+            }
+        }
+        return count
+    }
+
+    /** Quit em inglês: a ação da engrenagem sai "Quit Usage Monitor", não o texto em português. */
+    @Test
+    fun `o balao de app em ingles oferece quit usage monitor`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                HudAppBalloonContent(
+                    language = AppLanguage.EN,
+                    appVersion = CURRENT_APP_VERSION,
+                    countdown = null,
+                    updateIndicator = null,
+                    actions = {},
+                    onQuit = {}
+                )
+            }
+        }
+
+        onNodeWithTag(HUD_APP_BALLOON_QUIT_TAG).assertTextEquals("Quit Usage Monitor")
+    }
+
+    /** Rótulo da contagem em português: "Próxima coleta em", antes do relógio. */
+    @Test
+    fun `a contagem do balao diz proxima coleta em no portugues`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                HudAppBalloonContent(
+                    language = AppLanguage.PT,
+                    appVersion = CURRENT_APP_VERSION,
+                    countdown = { countdownOf(now + 2.minutes + 5.seconds) },
+                    updateIndicator = null,
+                    actions = {},
+                    onQuit = {}
+                )
+            }
+        }
+
+        onNodeWithText("Próxima coleta em").assertIsDisplayed()
+        onNodeWithText("Next fetch in").assertDoesNotExist()
+    }
+
+    /** Rótulo da contagem em inglês: "Next fetch in", e o português não aparece. */
+    @Test
+    fun `a contagem do balao diz next fetch in no ingles`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                HudAppBalloonContent(
+                    language = AppLanguage.EN,
+                    appVersion = CURRENT_APP_VERSION,
+                    countdown = { countdownOf(now + 2.minutes + 5.seconds) },
+                    updateIndicator = null,
+                    actions = {},
+                    onQuit = {}
+                )
+            }
+        }
+
+        onNodeWithText("Next fetch in").assertIsDisplayed()
+        onNodeWithText("Próxima coleta em").assertDoesNotExist()
+    }
+
+    /** Zero resets em inglês: "none", e o "nenhum" em português some. */
+    @Test
+    fun `o balao mostra none em ingles quando a contagem e zero`() = runDesktopComposeUiTest {
+        setBankedResets(bankedResetCount = 0, language = AppLanguage.EN)
+        onNodeWithText("none").assertIsDisplayed()
+        onNodeWithText("nenhum").assertDoesNotExist()
+    }
+
     @Test
     fun `o balao mostra nenhum reset quando a contagem e zero`() = runDesktopComposeUiTest {
         setBankedResets(bankedResetCount = 0, language = AppLanguage.PT)
@@ -2352,5 +2462,65 @@ class HudNotchTest {
             quotas = quotas.toList(),
             focusIndex = quotas.indices.maxByOrNull { index -> quotas[index].fraction } ?: 0
         )
+    }
+
+    /** Rótulo do clique num anel, nos dois idiomas: é o que o leitor de tela anuncia. */
+    @Test
+    fun `o rotulo de atualizar leva o nome da conta em portugues e em ingles`() {
+        val account = accounts.first()
+        val pt = hudRefreshAccountLabel(account, AppLanguage.PT)
+        val en = hudRefreshAccountLabel(account, AppLanguage.EN)
+        assertTrue(pt == "Atualizar INFORMATA2", "PT veio $pt")
+        assertTrue(en == "Refresh INFORMATA2", "EN veio $en")
+    }
+
+    /** Só Esc fecha o balão do buraco (L295): outra tecla o deixa aberto. */
+    @Test
+    fun `esc fecha o balao do buraco e outra tecla nao fecha`() = runDesktopComposeUiTest {
+        val minimized = accounts.first().copy(minimized = true)
+        val visible = accounts[1]
+        setContent { notch(expanded = true, edge = HudEdge.TOP, list = listOf(minimized, visible)) }
+
+        onNodeWithTag("hudBlackHole").performClick()
+        waitForIdle()
+        assertTrue(
+            onAllNodesWithText(minimized.label, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty(),
+            "a lista do buraco deveria estar aberta antes da tecla"
+        )
+
+        onNodeWithTag(HUD_CONTENT_TEST_TAG).performKeyInput {
+            keyDown(Key.A)
+            keyUp(Key.A)
+        }
+        waitForIdle()
+        assertTrue(
+            onAllNodesWithText(minimized.label, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty(),
+            "a tecla A nao deveria fechar a lista do buraco"
+        )
+
+        onNodeWithTag(HUD_CONTENT_TEST_TAG).performKeyInput {
+            keyDown(Key.Escape)
+            keyUp(Key.Escape)
+        }
+        waitForIdle()
+        assertTrue(
+            onAllNodesWithText(minimized.label, useUnmergedTree = true).fetchSemanticsNodes().isEmpty(),
+            "Esc deveria fechar a lista do buraco"
+        )
+    }
+
+    /** Com o balão de app aberto, tecla que não é Esc não o fecha (L295). */
+    @Test
+    fun `tecla que nao e esc nao fecha o balao de app`() = runDesktopComposeUiTest {
+        setContent { notchWithActions() }
+
+        onNodeWithContentDescription(GEAR).performClick()
+        waitForIdle()
+        onNodeWithTag(HUD_CONTENT_TEST_TAG).performKeyInput {
+            keyDown(Key.A)
+            keyUp(Key.A)
+        }
+        waitForIdle()
+        onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertIsDisplayed()
     }
 }
