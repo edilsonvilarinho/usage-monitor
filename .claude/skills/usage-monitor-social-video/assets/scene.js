@@ -176,11 +176,6 @@ WF.register({
       const s = Math.sin(rot)
       return { x: cam.cx + cam.z * (x * c - y * s), y: cam.cy + cam.z * (x * s + y * c), depth: Math.sin(th) }
     }
-    const recent = (sound, t, dur) => {
-      const out = []
-      for (const c of cues) if (c.sound === sound && t >= c.t && t - c.t < dur) out.push(t - c.t)
-      return out
-    }
 
     // Capítulos: só no longo (duração > 2 min). Primeiro e último beat (abertura e fechamento) não têm número.
     const longForm = duration > 120
@@ -277,17 +272,6 @@ WF.register({
         ctx.drawImage(starSprites[s.s], x - s.size / 2, y - s.size / 2, s.size, s.size)
       }
       ctx.globalAlpha = 1
-    }
-    const drawWaves = (t) => {
-      ctx.lineWidth = 3
-      ctx.lineWidth = 2
-      for (const age of recent('rise', t, 1.4)) {
-        const k = age / 1.4
-        ctx.strokeStyle = rgba(COL.hot, 0.5 * (1 - k))
-        ctx.beginPath()
-        ctx.arc(0, 0, RS * (0.4 + 2.4 * easeOut(k)), 0, Math.PI * 2)
-        ctx.stroke()
-      }
     }
     // Disco de acreção: metade de trás (atrás do horizonte) ou da frente (cruza o horizonte).
     // Doppler: lado que se aproxima quente; lado que se afasta em brasa.
@@ -670,7 +654,6 @@ WF.register({
         ctx.globalAlpha = 0.85
         ctx.drawImage(glowSprite, -RS * 2.8, -RS * 2.8, RS * 5.6, RS * 5.6)
         ctx.globalAlpha = 1
-        drawWaves(t)
         drawBand(t, cam, rot, false)
         drawDisc(t, cr, sr, cam, false)
         drawHorizon(t)

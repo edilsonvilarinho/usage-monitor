@@ -183,7 +183,7 @@ test('legendas de uma fala são contíguas e cobrem speechStart..speechEnd', () 
 
 // ---------- buildCues ----------
 
-test('cues: rise em 0, sem cue de transição, itens por status, impact no último beat, ordenados', () => {
+test('cues: sem som de abertura, sem cue de transição, itens por status, impact no último beat, ordenados', () => {
   const beats = [
     { id: 'a', index: 0, start: 0, end: 13.6, items: [{ text: 'x', at: 1.3 }] },
     {
@@ -202,13 +202,13 @@ test('cues: rise em 0, sem cue de transição, itens por status, impact no últi
   assert.deepEqual(
     cues.map((c) => [c.t, c.sound]),
     [
-      [0, 'rise'],
       [1.3, 'tick'],
       [14.3, 'red'],
       [16, 'green'],
       [27.2, 'impact'],
     ],
   )
+  assert.ok(cues.every((c) => ['tick', 'red', 'green', 'impact'].includes(c.sound)))
   assert.ok(cues.every((c, i) => i === 0 || c.t >= cues[i - 1].t))
 })
 
@@ -327,11 +327,10 @@ test('legendas usam o texto escrito, não a forma falada; beat sem short fica fo
   assert.ok(short.captions.every((c, i) => i === 0 || c.start >= short.captions[i - 1].end))
 })
 
-test('buildScript: cues ordenadas, rise primeiro, só sons de item, impact no fim', () => {
+test('buildScript: cues ordenadas, sem som de abertura, só sons de item, impact no fim', () => {
   const s = buildScript(SPEC, 'short', 'pt', SHORT_DUR)
-  assert.deepEqual(s.cues[0], { t: 0, sound: 'rise', note: 'abertura' })
   assert.ok(s.cues.every((c, i) => i === 0 || c.t >= s.cues[i - 1].t))
-  assert.ok(s.cues.every((c) => ['rise', 'tick', 'red', 'green', 'impact'].includes(c.sound)))
+  assert.ok(s.cues.every((c) => ['tick', 'red', 'green', 'impact'].includes(c.sound)))
   assert.equal(s.cues.at(-1).sound, 'impact')
 })
 

@@ -169,11 +169,12 @@ export function timeCaptions(text, speechStart, speechEnd) {
   })
 }
 
-// Cues ordenadas: rise em 0; um som por item (tick, red com crit, green com ok);
-// impact em 0,6 s do último beat. Sem som de transição entre beats.
+// Cues ordenadas: um som por item (tick, red com crit, green com ok); impact em 0,6 s do último beat.
+// Sem som de abertura (pedido do dono no #684): a música entra com fade-in de 2 s.
+// Sem som de transição entre beats.
 export function buildCues(beats) {
   if (!beats.length) return []
-  const raw = [{ tMs: 0, sound: 'rise', note: beats[0].id }]
+  const raw = []
   beats.forEach((b) => {
     for (const it of b.items) {
       const sound = it.status === 'crit' ? 'red' : it.status === 'ok' ? 'green' : 'tick'

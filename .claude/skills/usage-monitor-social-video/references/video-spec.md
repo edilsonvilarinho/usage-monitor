@@ -63,6 +63,6 @@ Entrada: lista `{ id, durationSec }` de falas, alvo e cauda. Primeira fala em 1,
 `items[j].at`: distribuídos por igual entre `speechStart + 0.3` e `speechEnd - 0.6`. No curto, só itens com `short`; se nenhum tiver, entram todos, até 4.
 
 Legendas: frases cortadas em pontuação, depois em vírgula, depois em espaço, até 72 caracteres; tempo proporcional aos caracteres, contíguas dentro da fala.
-Cues: `rise` em 0; por item, `tick`, ou `red` com `crit`, ou `green` com `ok`; `impact` em `start + 0.6` do último beat. Ordenados por tempo. Não há som de transição entre beats (pedido do dono no #684): a transição é só visual.
+Cues: por item, `tick`, ou `red` com `crit`, ou `green` com `ok`; `impact` em `start + 0.6` do último beat. Ordenados por tempo. Sem som de abertura (pedido do dono no #684): a música entra com fade-in de 2 s. Não há som de transição entre beats (pedido do dono no #684): a transição é só visual.
 
 Saída `window.WF_SCRIPT = { variant, lang, duration, beats, cues, captions, link }`, com `kicker`, `title` e `items` traduzidos para o idioma da variante.
