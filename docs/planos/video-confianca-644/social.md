@@ -1,8 +1,10 @@
-# Descrições para publicação (#682)
+# Descrições para publicação (#682, revisadas na #684)
 
 Publicação é manual. Números conferidos em 2026-11-26 nos planos de `docs/planos/` (lista em `video.json`, `facts`).
 Link do repositório: `https://github.com/edilsonvilarinho/usage-monitor`. A imagem do infográfico da palestra não entra no post:
 é de terceiro, sem licença.
+
+Vídeo: corte longo de 5 min, 16:9 (`long-pt` no LinkedIn, `long-en` no X). O X só aceita vídeo acima de 2 min 20 s em conta Premium.
 
 ## LinkedIn (PT)
 
@@ -22,6 +24,8 @@ O que aprendi:
 • Cobertura de linhas não mede verificação. Na suíte Compose ela foi de 95,39% para 95,40% enquanto os defeitos pegos subiam 15 pontos.
 • Teste escrito contra um defeito pega aquele defeito e pouco além: num lote que os agentes nunca viram, só 23% dos sobreviventes morreram.
 • Nenhum relato de agente vale sem conferência. Um registro salvo dizia 4 de 24; a repetição mostrou 14 de 24.
+
+O vídeo (5 min) conta a jornada em ordem: a motivação, como o app era antes, os conceitos da palestra, como aplicamos, o levantamento, os testes de cada camada, o desafio do teste de tela, o que deu errado e o que falta.
 
 Ainda não chegamos. A meta é passar 30 dias com no máximo 1% de PRs com defeito que escapa.
 
