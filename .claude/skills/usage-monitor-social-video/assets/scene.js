@@ -156,7 +156,7 @@ WF.register({
       const { index, p } = beatAt(t)
       const cur = poseOf(index)
       const pre = index > 0 ? poseOf(index - 1) : cur
-      const tr = easeInOut(span(t, beats[index].start, 1.2))
+      const tr = easeInOut(span(t, beats[index].start, 2.0))
       const L = (key) => pre[key] + (cur[key] - pre[key]) * tr
       const within = easeInOut(p)
       return {
@@ -175,11 +175,6 @@ WF.register({
       const c = Math.cos(rot)
       const s = Math.sin(rot)
       return { x: cam.cx + cam.z * (x * c - y * s), y: cam.cy + cam.z * (x * s + y * c), depth: Math.sin(th) }
-    }
-    const recent = (sound, t, dur) => {
-      const out = []
-      for (const c of cues) if (c.sound === sound && t >= c.t && t - c.t < dur) out.push(t - c.t)
-      return out
     }
 
     // Capítulos: só no longo (duração > 2 min). Primeiro e último beat (abertura e fechamento) não têm número.
@@ -277,23 +272,6 @@ WF.register({
         ctx.drawImage(starSprites[s.s], x - s.size / 2, y - s.size / 2, s.size, s.size)
       }
       ctx.globalAlpha = 1
-    }
-    const drawWaves = (t) => {
-      ctx.lineWidth = 3
-      for (const age of recent('whoosh', t, 1.0)) {
-        ctx.strokeStyle = rgba(COL.lens, 0.3 * (1 - age))
-        ctx.beginPath()
-        ctx.arc(0, 0, RS * (1.05 + 1.9 * easeOut(age)), 0, Math.PI * 2)
-        ctx.stroke()
-      }
-      ctx.lineWidth = 2
-      for (const age of recent('rise', t, 1.4)) {
-        const k = age / 1.4
-        ctx.strokeStyle = rgba(COL.hot, 0.5 * (1 - k))
-        ctx.beginPath()
-        ctx.arc(0, 0, RS * (0.4 + 2.4 * easeOut(k)), 0, Math.PI * 2)
-        ctx.stroke()
-      }
     }
     // Disco de acreção: metade de trás (atrás do horizonte) ou da frente (cruza o horizonte).
     // Doppler: lado que se aproxima quente; lado que se afasta em brasa.
@@ -580,7 +558,7 @@ WF.register({
       const fb = FRAME[idx]
       if (!img || !fb) return
       const beat = beats[idx]
-      const a = smooth(span(t, beat.start, 0.6)) * (1 - smooth(span(t, beat.end - 0.6, 0.6)))
+      const a = smooth(span(t, beat.start, 1.0)) * (1 - smooth(span(t, beat.end - 1.0, 1.0)))
       if (a <= 0.002) return
       const p = clamp((t - beat.start) / (beat.end - beat.start))
       const s = 1 + 0.04 * p
@@ -615,7 +593,7 @@ WF.register({
     const drawTitle = (idx, t) => {
       const beat = beats[idx]
       const tb = TB[idx]
-      const a = smooth(span(t, beat.start, 0.8)) * (1 - smooth(span(t, beat.end - 0.6, 0.6)))
+      const a = smooth(span(t, beat.start, 1.2)) * (1 - smooth(span(t, beat.end - 1.0, 1.0)))
       if (a <= 0.002) return
       ctx.globalAlpha = a
       ctx.fillStyle = rgba(COL.night, 0.7)
@@ -676,7 +654,6 @@ WF.register({
         ctx.globalAlpha = 0.85
         ctx.drawImage(glowSprite, -RS * 2.8, -RS * 2.8, RS * 5.6, RS * 5.6)
         ctx.globalAlpha = 1
-        drawWaves(t)
         drawBand(t, cam, rot, false)
         drawDisc(t, cr, sr, cam, false)
         drawHorizon(t)

@@ -341,25 +341,6 @@ def fade_end(x, seconds, release):
     return x * np.clip((seconds - t) / release, 0.0, 1.0)
 
 
-def fx_rise(rng):
-    seconds = 2.5
-    t = time_axis(seconds)
-    freq = 180.0 + (760.0 - 180.0) * (t / seconds) ** 2.2
-    tone = np.sin(2 * np.pi * np.cumsum(freq) / RATE)
-    air = peak_norm(bandpass(rng.standard_normal(len(t)), 300, 4000), 1.0)
-    env = (t / seconds) ** 2 * np.clip((seconds - t) / 0.02, 0.0, 1.0)
-    return peak_norm((0.55 * tone + 0.6 * air) * env, 0.5), seconds - 0.02, 0.0
-
-
-def fx_whoosh(rng):
-    seconds = 1.1
-    t = time_axis(seconds)
-    air = bandpass(rng.standard_normal(len(t)), 500, 2800)
-    env = np.sin(np.pi * t / seconds) ** 2
-    pan_pos = -0.9 + 1.8 * t / seconds
-    return peak_norm(air * env, 0.35), seconds / 2, pan_pos
-
-
 def fx_tick(_rng):
     seconds = 0.04
     t = time_axis(seconds)
@@ -395,8 +376,7 @@ def fx_impact(rng):
     return peak_norm(fade_end(env * (0.9 * sub + 0.25 * tail), seconds, 0.5), 0.7), 0.005, 0.0
 
 
-EFFECTS = {"rise": fx_rise, "whoosh": fx_whoosh, "tick": fx_tick, "red": fx_red,
-           "green": fx_green, "impact": fx_impact}
+EFFECTS = {"tick": fx_tick, "red": fx_red, "green": fx_green, "impact": fx_impact}
 
 
 def render_sfx(tl, cues):

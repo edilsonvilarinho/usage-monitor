@@ -18,7 +18,17 @@
     "#513: 18.792 para 6.077 tokens de entrada por chamada de agente, -68%",
     "#644: meta de 30 dias com até 1% de PRs com defeito que escapa",
     "#679: registro salvo do replay T6 dizia 4 de 24; a repetição mostrou 14 de 24",
-    "#679: 15 arquivos de risco, 95% das linhas cobertas"
+    "#679: 15 arquivos de risco, 95% das linhas cobertas",
+    "#645: janela de 33 dias (2026-10-22 a 2026-11-23); origem por citação ou blame; 1 das 11 origens virou revert",
+    "#645: janela da HUD (hud-window) 3 de 16 PRs, 18,8%",
+    "#646: 10 regras (R1 a R10), exemplo que reprova e que passa",
+    "meta de 95% de linhas (CLAUDE.md, cobertura com catraca)",
+    "compose-implementation.md: cena do teste de componente 1024 × 768",
+    "#651: screen-diff, antes e depois das telas do PR",
+    "#652: gravação a cada ~50 ms, conta sintética, sem rede",
+    "#657: 9 defeitos plantados; 270 gravações sem alarme falso (270/270)",
+    "#669: 39 de 960 partidas (4,1%); prova 0 em 960",
+    "#679: rodada interrompida no desligamento: 8 error e 12 noise, 20 vereditos falsos, zerados e refeitos"
   ],
   "beats": [
     {
@@ -38,6 +48,10 @@
           "short": true
         },
         {
+          "pt": "Lauren Tan · AI Engineer",
+          "en": "Lauren Tan · AI Engineer"
+        },
+        {
           "pt": "issue #644",
           "en": "issue #644",
           "mono": true,
@@ -49,15 +63,51 @@
         "en": "A talk left us with one question: can we trust the code AI agents write?"
       },
       "long": {
-        "pt": "O Usage Monitor é escrito por agentes de IA, do pedido ao merge. Uma palestra de Lauren Tan, All Code Is Slop, Except Mine, nos fez uma pergunta: dá para confiar nesse código? Abrimos a issue seiscentos e quarenta e quatro para medir a distância até lá.",
-        "en": "Usage Monitor is written by AI agents, from request to merge. A talk by Lauren Tan, All Code Is Slop, Except Mine, left us with an uncomfortable question: can we trust that code? We opened issue six forty-four to measure how far we were."
+        "pt": "O Usage Monitor é escrito por agentes de IA, do pedido ao merge. Mas a palestra All Code Is Slop, Except Mine, de Lauren Tan, nos fez uma pergunta incômoda: dá para confiar nesse código? Teste verde não era resposta. Então fomos medir.",
+        "en": "Usage Monitor is written by AI agents, from request to merge. Then a talk by Lauren Tan, All Code Is Slop, Except Mine, left us with an uncomfortable question: can we trust that code? A green test was not an answer. So we went to measure."
       }
     },
     {
-      "id": "piramide",
+      "id": "antes",
       "kicker": {
-        "pt": "O mapa",
-        "en": "The map"
+        "pt": "Antes",
+        "en": "Before"
+      },
+      "title": {
+        "pt": "Como o app era feito",
+        "en": "How the app was built"
+      },
+      "items": [
+        {
+          "pt": "issue → plano → teste → PR",
+          "en": "issue → plan → test → PR"
+        },
+        {
+          "pt": "95% das linhas cobertas",
+          "en": "95% of lines covered",
+          "status": "ok"
+        },
+        {
+          "pt": "Linux só avisava",
+          "en": "Linux only warned",
+          "status": "crit"
+        },
+        {
+          "pt": "regras só em texto",
+          "en": "rules only in text",
+          "status": "crit"
+        }
+      ],
+      "long": {
+        "pt": "O ponto de partida já era automatizado. Cada pedido virava issue, plano e teste escrito antes do código, e a cobertura de linhas tinha piso alto. Mas muitas regras viviam só em texto, o Linux apenas avisava, e ninguém sabia quantos defeitos passavam pela revisão.",
+        "en": "The starting point was already automated. Every request became an issue, a plan and a test written before the code, and line coverage had a high floor. But many rules lived only in text, Linux only warned, and nobody knew how many defects slipped past review."
+      }
+    },
+    {
+      "id": "palestra",
+      "kicker": {
+        "pt": "A palestra",
+        "en": "The talk"
       },
       "title": {
         "pt": "Pirâmide invertida",
@@ -65,28 +115,69 @@
       },
       "items": [
         {
-          "pt": "1. código e arquitetura",
-          "en": "1. code and architecture"
+          "pt": "1. arquitetura e regras que a máquina cobra",
+          "en": "1. architecture and machine-enforced rules"
         },
         {
-          "pt": "2. verificação",
-          "en": "2. verification"
+          "pt": "2. verificação: propriedade, app real",
+          "en": "2. verification: properties, real app"
         },
         {
-          "pt": "3. prosa e contexto",
-          "en": "3. prose and context"
+          "pt": "3. por último, prosa",
+          "en": "3. last, prose"
+        },
+        {
+          "pt": "21,5% do Kotlin era comentário",
+          "en": "21.5% of Kotlin was comments",
+          "status": "crit"
         }
       ],
       "long": {
-        "pt": "A palestra propõe investir em confiança nesta ordem: primeiro o que é determinístico, código, arquitetura e regras que o compilador cobra. Depois, verificação. Por último, prosa: arquivos de regras e instruções para o agente. Usamos essa ordem como mapa.",
-        "en": "The talk ranks where trust comes from: first what is deterministic, code, architecture and rules a compiler enforces. Then verification. Last, prose: rule files and instructions for the agent. We used that order as our map."
+        "pt": "A palestra propõe uma ordem para a confiança. Primeiro, o determinístico: arquitetura e regras que uma máquina cobra. Depois, verificação: propriedades e o app rodando de verdade. Por último, prosa. No nosso app faltava o meio: nenhum teste de propriedade, e a janela real só era vista à mão.",
+        "en": "The talk proposes an order for trust. First, what is deterministic: architecture and rules a machine enforces. Then verification: properties and the app actually running. Last, prose. Our app was missing the middle: no property tests, and the real window was only checked by hand."
       }
     },
     {
-      "id": "medir",
+      "id": "aplicar",
       "kicker": {
-        "pt": "Passo 1",
-        "en": "Step 1"
+        "pt": "Como aplicar",
+        "en": "The plan"
+      },
+      "title": {
+        "pt": "Cada lacuna virou uma issue",
+        "en": "Every gap became an issue"
+      },
+      "items": [
+        {
+          "pt": "#645 medir",
+          "en": "#645 measure",
+          "mono": true
+        },
+        {
+          "pt": "#646 #647 #648 #649 regras",
+          "en": "#646 #647 #648 #649 rules",
+          "mono": true
+        },
+        {
+          "pt": "#650 #651 #652 verificação",
+          "en": "#650 #651 #652 verification",
+          "mono": true
+        },
+        {
+          "pt": "meta: 30 dias com até 1% de escape",
+          "en": "goal: 30 days, at most 1% escaping"
+        }
+      ],
+      "long": {
+        "pt": "Cada lacuna virou uma issue, na ordem da pirâmide: medir, depois regras, depois verificação. E definimos o que é chegar lá: 30 dias com no máximo um por cento de PRs com defeito que escapa.",
+        "en": "Every gap became an issue, in pyramid order: measure, then rules, then verification. And we defined what arriving means: 30 days with at most one percent of PRs letting a defect escape."
+      }
+    },
+    {
+      "id": "levantamento",
+      "kicker": {
+        "pt": "Levantamento",
+        "en": "The survey"
       },
       "title": {
         "pt": "Medir antes de mudar",
@@ -94,14 +185,22 @@
       },
       "items": [
         {
-          "pt": "15,5% dos PRs de produto",
-          "en": "15.5% of product PRs",
+          "pt": "fix → PR de origem: citação ou blame",
+          "en": "fix → source PR: reference or blame"
+        },
+        {
+          "pt": "veredito conferido à mão",
+          "en": "every verdict checked by hand"
+        },
+        {
+          "pt": "11 de 71 PRs de produto · 15,5%",
+          "en": "11 of 71 product PRs · 15.5%",
+          "status": "crit",
           "short": true
         },
         {
-          "pt": "11 de 71",
-          "en": "11 of 71",
-          "short": true
+          "pt": "só 1 virou revert",
+          "en": "only 1 became a revert"
         }
       ],
       "short": {
@@ -113,12 +212,8 @@
         }
       },
       "long": {
-        "pt": "Antes de mudar qualquer coisa, medimos. Um script percorreu os PRs e procurou cada defeito que passou pela revisão e voltou como correção. Resultado: 15,5% dos PRs de produto, 11 de 71. Contar reverts teria escondido isso.",
-        "en": "Before changing anything, we measured. A script went through the PRs and looked for every defect that passed review and came back as a fix. Result: 15.5% of product PRs, 11 of 71. Counting reverts would have hidden it.",
-        "say": {
-          "pt": "Antes de mudar qualquer coisa, medimos. Um script percorreu os PRs e procurou cada defeito que passou pela revisão e voltou como correção. Resultado: quinze e meio por cento dos PRs de produto, onze de setenta e um. Contar reverts teria escondido isso.",
-          "en": "Before changing anything, we measured. A script went through the PRs and looked for every defect that passed review and came back as a fix. Result: fifteen and a half percent of product PRs, eleven of seventy-one. Counting reverts would have hidden it."
-        }
+        "pt": "Primeiro, medimos. Um script percorreu 33 dias de PRs e ligou cada correção ao PR que criou o defeito, pela citação ou pelo blame da linha. Cada caso foi conferido à mão. Resultado: 11 de 71 PRs de produto deixaram defeito escapar. Só um virou revert.",
+        "en": "First, we measured. A script went through 33 days of PRs and linked each fix to the PR that caused the defect, by reference or by blaming the line. Every case was checked by hand. Result: 11 of 71 product PRs let a defect escape. Only one became a revert."
       }
     },
     {
@@ -139,43 +234,15 @@
           "short": true
         },
         {
-          "pt": "193 identificadores conferidos",
-          "en": "193 identifiers checked"
-        },
-        {
           "pt": "desktop-linux bloqueia o merge",
           "en": "desktop-linux blocks the merge",
           "mono": true,
+          "status": "ok",
           "short": true
-        }
-      ],
-      "short": {
-        "pt": "Depois, regras escritas em texto viraram teste, e o Linux passou a bloquear o merge.",
-        "en": "Then rules written as text became tests, and Linux started blocking the merge."
-      },
-      "long": {
-        "pt": "Regra que só existe em texto o agente esquece. Cada regra do CLAUDE.md que um teste consegue verificar virou teste: ProseArchitectureRulesTest. O script conferiu 193 identificadores citados no arquivo, e nenhum estava faltando no código. O job do Linux, que antes só avisava, passou a bloquear o merge.",
-        "en": "A rule that only lives in text, the agent forgets. Every rule in CLAUDE.md that a test can check became a test: ProseArchitectureRulesTest. A script checked 193 identifiers the file cites, and none were missing from the code. The Linux job, which used to only warn, now blocks the merge.",
-        "say": {
-          "pt": "Regra que só existe em texto o agente esquece. Cada regra do Claude ponto M D que um teste consegue verificar virou teste. O script conferiu cento e noventa e três identificadores citados no arquivo, e nenhum estava faltando no código. O job do Linux, que antes só avisava, passou a bloquear o merge.",
-          "en": "A rule that only lives in text, the agent forgets. Every rule in Claude dot M D that a test can check became a test. A script checked one hundred ninety-three identifiers the file cites, and none were missing from the code. The Linux job, which used to only warn, now blocks the merge."
-        }
-      }
-    },
-    {
-      "id": "lint",
-      "kicker": {
-        "pt": "Camada 1",
-        "en": "Layer 1"
-      },
-      "title": {
-        "pt": "Catraca e lint",
-        "en": "Ratchets and lint"
-      },
-      "items": [
+        },
         {
-          "pt": "21,5% do Kotlin era comentário",
-          "en": "21.5% of Kotlin was comments"
+          "pt": "catraca: comentário só desce",
+          "en": "ratchet: comments only go down"
         },
         {
           "pt": "CancellationArchitectureRulesTest",
@@ -184,17 +251,80 @@
         },
         {
           "pt": "7 pontos corrigidos",
-          "en": "7 spots fixed",
+          "en": "7 places fixed",
+          "status": "ok"
+        }
+      ],
+      "short": {
+        "pt": "Depois, regras escritas em texto viraram teste, e o Linux passou a bloquear o merge.",
+        "en": "Then rules written as text became tests, and Linux started blocking the merge."
+      },
+      "long": {
+        "pt": "Com o número na mão, atacamos a base. Regras que só existiam no CLAUDE.md viraram teste. O Linux passou a bloquear o merge, uma catraca impede o comentário de crescer, e uma regra nova achou cancelamento de corrotina engolido em 7 pontos.",
+        "en": "With the number in hand, we went after the base. Rules that only lived in CLAUDE.md became tests. Linux started blocking the merge, a ratchet stops comments from growing, and a new rule found swallowed coroutine cancellation in 7 places."
+      }
+    },
+    {
+      "id": "propriedade",
+      "kicker": {
+        "pt": "Camada 2",
+        "en": "Layer 2"
+      },
+      "title": {
+        "pt": "Teste de propriedade",
+        "en": "Property tests"
+      },
+      "items": [
+        {
+          "pt": "HudGeometryPropertyTest",
+          "en": "HudGeometryPropertyTest",
+          "mono": true
+        },
+        {
+          "pt": "Random(seed): a falha se repete",
+          "en": "Random(seed): failures replay",
+          "mono": true
+        },
+        {
+          "pt": "10 de 10 mutações pegas",
+          "en": "10 of 10 mutations caught",
           "status": "ok"
         }
       ],
       "long": {
-        "pt": "Comentário longo é onde o agente justifica gambiarra. Medimos 21,5% do Kotlin de produção em comentário e pusemos uma catraca: o teto só desce. Uma regra nova pegou cancelamento de corrotina engolido em 7 pontos do código, e todos foram corrigidos.",
-        "en": "Long comments are where an agent justifies a hack. We measured 21.5% of production Kotlin as comments and added a ratchet: the ceiling only goes down. A new rule caught swallowed coroutine cancellation in 7 places, and all of them were fixed.",
-        "say": {
-          "pt": "Comentário longo é onde o agente justifica gambiarra. Medimos vinte e um e meio por cento do Kotlin de produção em comentário e pusemos uma catraca: o teto só desce. Uma regra nova pegou cancelamento de corrotina engolido em sete pontos do código, e todos foram corrigidos.",
-          "en": "Long comments are where an agent justifies a hack. We measured twenty-one and a half percent of production Kotlin as comments and added a ratchet: the ceiling only goes down. A new rule caught swallowed coroutine cancellation in seven places, and all of them were fixed."
+        "pt": "Na verificação, começamos pela geometria do notch da HUD. Em vez de exemplos fixos, um gerador sorteia entradas, e o teste cobra regras que valem para qualquer caso. Quebramos o código dez vezes. O teste pegou as dez.",
+        "en": "For verification, we started with the HUD notch geometry. Instead of fixed examples, a generator draws inputs, and the test enforces rules that hold for any case. We broke the code ten times. The test caught all ten."
+      }
+    },
+    {
+      "id": "tela",
+      "kicker": {
+        "pt": "O desafio",
+        "en": "The challenge"
+      },
+      "title": {
+        "pt": "Teste de tela não vê a janela",
+        "en": "Screen tests miss the window"
+      },
+      "items": [
+        {
+          "pt": "cena fora da tela: 1024 × 768",
+          "en": "offscreen scene: 1024 × 768"
+        },
+        {
+          "pt": "janela nativa: invisível ao teste",
+          "en": "native window: invisible to tests",
+          "status": "crit"
+        },
+        {
+          "pt": "janela da HUD: 3 de 16 PRs · 18,8%",
+          "en": "HUD window: 3 of 16 PRs · 18.8%",
+          "status": "crit"
         }
+      ],
+      "long": {
+        "pt": "Então veio o maior desafio. O teste de tela do Compose desenha fora da tela. Ele não vê a janela nativa: o recorte do notch, o instante em que ela aparece. E o levantamento achou defeito escapando justamente na janela da HUD.",
+        "en": "Then came the hardest part. A Compose screen test draws offscreen. It never sees the native window: the notch cutout, the moment it appears. And the survey found defects escaping right there, in the HUD window."
       }
     },
     {
@@ -209,8 +339,17 @@
       },
       "items": [
         {
+          "pt": "instalador real, conta sintética, sem rede",
+          "en": "real installer, fake account, no network"
+        },
+        {
+          "pt": "grava a tela a cada ~50 ms",
+          "en": "records the screen every ~50 ms"
+        },
+        {
           "pt": "15 de 15 gravações",
           "en": "15 of 15 recordings",
+          "status": "ok",
           "short": true
         },
         {
@@ -219,8 +358,8 @@
           "short": true
         },
         {
-          "pt": "10/10 mutações na HUD",
-          "en": "10/10 HUD mutations"
+          "pt": "270 gravações sem alarme falso",
+          "en": "270 recordings, no false alarm"
         }
       ],
       "short": {
@@ -232,19 +371,15 @@
         }
       },
       "long": {
-        "pt": "Teste de componente não vê a janela de verdade. Então o CI instala o app, abre, grava a tela e compara. Na prova, a gravação separou a versão com defeito em 15 de 15 vezes, e depois deu 155 de 155 vereditos exatos. A geometria da HUD ganhou testes de propriedade, que mataram 10 de 10 mutações.",
-        "en": "A component test cannot see the real window. So CI installs the app, opens it, records the screen and compares. In the trial, the recording caught the broken build 15 out of 15 times, then gave 155 of 155 exact verdicts. The HUD geometry got property tests, which killed 10 of 10 mutations.",
-        "say": {
-          "pt": "Teste de componente não vê a janela de verdade. Então o C I instala o app, abre, grava a tela e compara. Na prova, a gravação separou a versão com defeito em quinze de quinze vezes, e depois deu cento e cinquenta e cinco de cento e cinquenta e cinco vereditos exatos. A geometria da HUD ganhou testes de propriedade, que mataram dez de dez mutações.",
-          "en": "A component test cannot see the real window. So C I installs the app, opens it, records the screen and compares. In the trial, the recording caught the broken build fifteen out of fifteen times, then gave one hundred fifty-five of one hundred fifty-five exact verdicts. The HUD geometry got property tests, which killed ten of ten mutations."
-        }
+        "pt": "A saída: testar o produto como o usuário recebe. O CI roda o instalador real, abre o app sem rede e grava a tela. Um script compara os pixels quadro a quadro. Com defeitos plantados, acertou todos os vereditos.",
+        "en": "The way out: test the product the way users get it. CI runs the real installer, opens the app offline and records the screen. A script compares the pixels frame by frame. With planted defects, it got every verdict right."
       }
     },
     {
       "id": "flash",
       "kicker": {
-        "pt": "No app",
-        "en": "In the app"
+        "pt": "O que mudou no app",
+        "en": "What changed"
       },
       "title": {
         "pt": "O flash que sumiu",
@@ -252,9 +387,13 @@
       },
       "items": [
         {
-          "pt": "4,1% das partidas",
-          "en": "4.1% of starts",
+          "pt": "39 de 960 partidas · 4,1%",
+          "en": "39 of 960 starts · 4.1%",
           "status": "crit"
+        },
+        {
+          "pt": "janela escondida no compositor",
+          "en": "window cloaked in the compositor"
         },
         {
           "pt": "0 em 960 partidas",
@@ -263,19 +402,15 @@
         }
       ],
       "long": {
-        "pt": "Com o app real medido no CI, um defeito antigo apareceu em número: no Windows, a janela pré-aquecida piscava opaca em 4,1% das partidas. Depois da correção, zero em 960 partidas.",
-        "en": "With the real app measured in CI, an old defect showed up as a number: on Windows, the prewarmed window flashed opaque in 4.1% of starts. After the fix, zero in 960 starts.",
-        "say": {
-          "pt": "Com o app real medido no C I, um defeito antigo apareceu em número: no Windows, a janela pré-aquecida piscava opaca em quatro vírgula um por cento das partidas. Depois da correção, zero em novecentas e sessenta partidas.",
-          "en": "With the real app measured in C I, an old defect showed up as a number: on Windows, the prewarmed window flashed opaque in four point one percent of starts. After the fix, zero in nine hundred sixty starts."
-        }
+        "pt": "E um defeito antigo virou número: no Windows, a janela pré-aquecida piscava em 39 de 960 partidas. A correção esconde a janela no compositor antes de mostrá-la. Depois, em 960 partidas: zero.",
+        "en": "And an old defect became a number: on Windows, the prewarmed window flashed in 39 of 960 starts. The fix cloaks the window in the compositor before showing it. After it, over 960 starts: zero."
       }
     },
     {
-      "id": "mutacao-telas",
+      "id": "mutacao",
       "kicker": {
-        "pt": "Camada 2",
-        "en": "Layer 2"
+        "pt": "Testar os testes",
+        "en": "Testing the tests"
       },
       "title": {
         "pt": "Quebrar de propósito",
@@ -283,30 +418,39 @@
       },
       "items": [
         {
-          "pt": "testes de tela: 67,1% → 96,0%",
-          "en": "screen tests: 67.1% → 96.0%"
+          "pt": "troca operador, constante, condição",
+          "en": "swap an operator, constant, condition"
+        },
+        {
+          "pt": "recompila só o arquivo e roda",
+          "en": "recompile one file and run"
+        },
+        {
+          "pt": "nada reprovou = furo",
+          "en": "nothing failed = a gap",
+          "status": "crit"
+        },
+        {
+          "pt": "ferramentas de tela: 67,1% → 96,0%",
+          "en": "screen tools: 67.1% → 96.0%",
+          "status": "ok"
         }
       ],
       "long": {
-        "pt": "Teste verde não prova que o teste olha alguma coisa. Então quebramos o código de propósito, um defeito por vez, e contamos quantos os testes reprovam. Nos testes de tela, os defeitos pegos foram de 67,1% para 96%.",
-        "en": "A green test does not prove the test is looking at anything. So we broke the code on purpose, one defect at a time, and counted how many the tests caught. In the screen tests, caught defects went from 67.1% to 96%.",
-        "say": {
-          "pt": "Teste verde não prova que o teste olha alguma coisa. Então quebramos o código de propósito, um defeito por vez, e contamos quantos os testes reprovam. Nos testes de tela, os defeitos pegos foram de sessenta e sete para noventa e seis por cento.",
-          "en": "A green test does not prove the test is looking at anything. So we broke the code on purpose, one defect at a time, and counted how many the tests caught. In the screen tests, caught defects went from sixty-seven to ninety-six percent."
-        }
+        "pt": "Faltava a pergunta mais dura: os testes olham alguma coisa? O teste de mutação responde. Um script planta um defeito por vez, num operador ou numa condição, e roda os testes. Se nada reprova, é um furo, e o furo vira teste.",
+        "en": "The hardest question was left: do the tests look at anything? Mutation testing answers it. A script plants one defect at a time, in an operator or a condition, and runs the tests. If nothing fails, that is a gap, and the gap becomes a test."
       }
     },
     {
       "id": "compose",
       "kicker": {
-        "pt": "Camada 2",
-        "en": "Layer 2"
+        "pt": "Testar os testes",
+        "en": "Testing the tests"
       },
       "title": {
         "pt": "Cobertura não é prova",
         "en": "Coverage is not proof"
       },
-      "climax": true,
       "items": [
         {
           "pt": "mutantes mortos 54,5% → 69,5%",
@@ -315,13 +459,17 @@
         },
         {
           "pt": "linhas cobertas 95,39% → 95,40%",
-          "en": "line coverage 95.39% → 95.40%",
+          "en": "lines covered 95.39% → 95.40%",
           "short": true
         },
         {
           "pt": "110 de 128 furos fechados",
           "en": "110 of 128 gaps closed",
           "status": "ok"
+        },
+        {
+          "pt": "nunca visto: 61,4% → 70,4%",
+          "en": "never seen: 61.4% → 70.4%"
         }
       ],
       "short": {
@@ -333,42 +481,43 @@
         }
       },
       "long": {
-        "pt": "Na suíte Compose, em quinze arquivos de risco, os testes pegavam 54,5% dos defeitos com 95% das linhas cobertas. Escrevemos testes só onde havia furo, cada um provado pelo defeito que passa a reprovar: 110 de 128 furos fechados, e 69,5% pegos. A cobertura de linhas foi de 95,39 para 95,40%.",
-        "en": "In the Compose suite, across fifteen high-risk files, the tests caught 54.5% of defects with 95% of lines covered. We wrote tests only where there was a gap, each proven by the defect it now fails: 110 of 128 gaps closed, and 69.5% caught. Line coverage went from 95.39 to 95.40%.",
+        "pt": "Na suíte Compose, com 95% das linhas cobertas, os testes pegavam só 54,5% dos defeitos. Os agentes fecharam 110 de 128 furos, e os pegos subiram para 69,5%. A cobertura de linhas quase não se mexeu.",
+        "en": "In the Compose suite, with 95% of lines covered, the tests caught only 54.5% of defects. The agents closed 110 of 128 gaps, and caught defects rose to 69.5%. Line coverage barely moved.",
         "say": {
-          "pt": "Na suíte Compose, em quinze arquivos de risco, os testes pegavam cinquenta e quatro e meio por cento dos defeitos com noventa e cinco por cento das linhas cobertas. Escrevemos testes só onde havia furo, cada um provado pelo defeito que passa a reprovar: cento e dez de cento e vinte e oito furos fechados, e sessenta e nove e meio por cento pegos. A cobertura de linhas mal se moveu.",
-          "en": "In the Compose suite, across fifteen high-risk files, the tests caught fifty-four and a half percent of defects with ninety-five percent of lines covered. We wrote tests only where there was a gap, each proven by the defect it now fails: one hundred ten of one hundred twenty-eight gaps closed, and sixty-nine and a half percent caught. Line coverage barely moved."
+          "pt": "Na suíte Compose, com noventa e cinco por cento das linhas cobertas, os testes pegavam só cinquenta e quatro e meio por cento dos defeitos. Os agentes fecharam 110 de 128 furos, e os pegos subiram para sessenta e nove e meio por cento. A cobertura de linhas quase não se mexeu.",
+          "en": "In the Compose suite, with ninety-five percent of lines covered, the tests caught only fifty-four point five percent of defects. The agents closed 110 of 128 gaps, and caught defects rose to sixty-nine point five percent. Line coverage barely moved."
         }
       }
     },
     {
-      "id": "nunca-visto",
+      "id": "errado",
       "kicker": {
-        "pt": "Prova honesta",
-        "en": "Honest check"
+        "pt": "O que deu errado",
+        "en": "What went wrong"
       },
       "title": {
-        "pt": "Defeitos nunca vistos",
-        "en": "Defects never seen"
+        "pt": "Relato não é prova",
+        "en": "A report is not proof"
       },
       "items": [
         {
-          "pt": "61,4% → 70,4%",
-          "en": "61.4% → 70.4%"
+          "pt": "registro salvo: 4 de 24",
+          "en": "saved record: 4 of 24",
+          "status": "crit"
         },
         {
-          "pt": "só 23% dos vivos",
-          "en": "only 23% of survivors",
-          "status": "crit"
+          "pt": "repetido: 14 de 24",
+          "en": "rerun: 14 of 24",
+          "status": "ok"
+        },
+        {
+          "pt": "20 vereditos falsos, refeitos",
+          "en": "20 false verdicts, redone"
         }
       ],
       "long": {
-        "pt": "Faltava saber se os testes novos valiam além dos defeitos que os agentes viram. Num segundo lote, nunca mostrado a eles, os pegos foram de 61,4% para 70,4%. Ajuda, mas só 23% dos sobreviventes morreram: teste escrito contra um defeito pega aquele defeito, e pouco além.",
-        "en": "We still had to know whether the new tests worked beyond the defects the agents saw. On a second batch, never shown to them, caught defects went from 61.4% to 70.4%. It helps, but only 23% of survivors died: a test written against one defect catches that defect, and little more.",
-        "say": {
-          "pt": "Faltava saber se os testes novos valiam além dos defeitos que os agentes viram. Num segundo lote, nunca mostrado a eles, os pegos foram de sessenta e um para setenta por cento. Ajuda, mas só vinte e três por cento dos sobreviventes morreram: teste escrito contra um defeito pega aquele defeito, e pouco além.",
-          "en": "We still had to know whether the new tests worked beyond the defects the agents saw. On a second batch, never shown to them, caught defects went from sixty-one to seventy percent. It helps, but only twenty-three percent of survivors died: a test written against one defect catches that defect, and little more."
-        }
+        "pt": "Nem tudo saiu certo. Um registro salvo dizia que os testes novos pegavam 4 de 24 defeitos. Repetida a medida, eram 14. E uma rodada longa, cortada quando a máquina desligou, deixou 20 vereditos falsos.",
+        "en": "Not everything went right. A saved record said the new tests caught 4 of 24 defects. Rerun, it was 14. And a long run, cut off when the machine shut down, left 20 false verdicts."
       }
     },
     {
@@ -393,6 +542,10 @@
           "short": true
         },
         {
+          "pt": "teste contra um defeito pega pouco além",
+          "en": "a test for one defect catches little else"
+        },
+        {
           "pt": "conferir, nunca confiar no relato",
           "en": "check, never trust the report"
         }
@@ -402,48 +555,15 @@
         "en": "The lesson: an executed line is not verified behavior."
       },
       "long": {
-        "pt": "Três lições. Medir antes de mudar. Linha executada não é comportamento verificado. E nenhum relato de agente vale sem conferência: um registro salvo dizia 4 de 24, e a repetição mostrou 14 de 24.",
-        "en": "Three lessons. Measure before changing. An executed line is not verified behavior. And no agent report counts without a check: one saved record said 4 of 24, and the rerun showed 14 of 24.",
-        "say": {
-          "pt": "Três lições. Medir antes de mudar. Linha executada não é comportamento verificado. E nenhum relato de agente vale sem conferência: um registro salvo dizia quatro de vinte e quatro, e a repetição mostrou catorze de vinte e quatro.",
-          "en": "Three lessons. Measure before changing. An executed line is not verified behavior. And no agent report counts without a check: one saved record said four of twenty-four, and the rerun showed fourteen of twenty-four."
-        }
-      }
-    },
-    {
-      "id": "falta",
-      "kicker": {
-        "pt": "O que falta",
-        "en": "What's next"
-      },
-      "title": {
-        "pt": "Ainda não chegamos",
-        "en": "Not there yet"
-      },
-      "items": [
-        {
-          "pt": "30 dias com até 1% de escape",
-          "en": "30 days at 1% escapes or less"
-        },
-        {
-          "pt": "agente que usa cada beta",
-          "en": "an agent that uses every beta"
-        }
-      ],
-      "long": {
-        "pt": "Ainda não chegamos. A meta é passar 30 dias com no máximo um por cento de PRs com defeito que escapa. Falta também um agente que use cada versão beta e abra issue do que achar.",
-        "en": "We are not there yet. The goal is 30 days with at most one percent of PRs letting a defect escape. We also still need an agent that uses every beta and files an issue for what it finds.",
-        "say": {
-          "pt": "Ainda não chegamos. A meta é passar trinta dias com no máximo um por cento de PRs com defeito que escapa. Falta também um agente que use cada versão beta e abra issue do que achar.",
-          "en": "We are not there yet. The goal is thirty days with at most one percent of PRs letting a defect escape. We also still need an agent that uses every beta and files an issue for what it finds."
-        }
+        "pt": "O que melhorou: o Linux bloqueia o merge, a janela real é gravada, o flash sumiu, e os testes pegam mais defeito. O que aprendemos: medir antes de mudar. Linha executada não é comportamento verificado. E nenhum relato de agente vale sem conferência.",
+        "en": "What improved: Linux blocks the merge, the real window is recorded, the flash is gone, and the tests catch more defects. What we learned: measure before changing. An executed line is not verified behavior. And no agent report counts without a check."
       }
     },
     {
       "id": "fim",
       "kicker": {
-        "pt": "Usage Monitor",
-        "en": "Usage Monitor"
+        "pt": "Ainda não chegamos",
+        "en": "Not there yet"
       },
       "title": {
         "pt": "Confiança se constrói",
@@ -454,8 +574,8 @@
         "en": "Usage Monitor. Trust in agents is built into the environment."
       },
       "long": {
-        "pt": "Usage Monitor, código aberto. Confiança no agente não vem do modelo: se constrói no ambiente em que ele trabalha.",
-        "en": "Usage Monitor, open source. Trust in agents does not come from the model: it is built into the environment they work in."
+        "pt": "Ainda não chegamos: faltam 30 dias com no máximo um por cento de escape. Usage Monitor, código aberto. Confiança no agente não vem do modelo. Se constrói no ambiente em que ele trabalha.",
+        "en": "We are not there yet: we still need 30 days with at most one percent escaping. Usage Monitor, open source. Trust in agents does not come from the model. It is built into the environment they work in."
       }
     }
   ]

@@ -51,10 +51,8 @@ A legenda usa sempre o texto escrito.
 | Variante | Formato | Arquivos |
 |---|---|---|
 | `short-pt` | 9:16 | `<slug>-tiktok-pt.mp4`, `<slug>-shorts-pt.mp4` (mesmo conteúdo) |
-| `short-pt` | 16:9 | `<slug>-linkedin-pt.mp4` |
-| `short-en` | 16:9 | `<slug>-x-en.mp4` |
-| `long-pt` | 16:9 | `<slug>-youtube-pt.mp4` |
-| `long-en` | 16:9 | `<slug>-youtube-en.mp4` |
+| `long-pt` | 16:9 | `<slug>-linkedin-pt.mp4`, `<slug>-youtube-pt.mp4` |
+| `long-en` | 16:9 | `<slug>-x-en.mp4`, `<slug>-youtube-en.mp4` |
 
 Vozes: `elevenlabs/eleven-v4`, `matilda` (PT), `george` (EN). Pasta de trabalho: `build/social-video/<slug>/`. Saída: `~/Videos/usage-monitor/<slug>/`.
 
@@ -65,6 +63,6 @@ Entrada: lista `{ id, durationSec }` de falas, alvo e cauda. Primeira fala em 1,
 `items[j].at`: distribuídos por igual entre `speechStart + 0.3` e `speechEnd - 0.6`. No curto, só itens com `short`; se nenhum tiver, entram todos, até 4.
 
 Legendas: frases cortadas em pontuação, depois em vírgula, depois em espaço, até 72 caracteres; tempo proporcional aos caracteres, contíguas dentro da fala.
-Cues: `rise` em 0; `whoosh` em cada `start - 0.3` exceto o primeiro; por item, `tick`, ou `red` com `crit`, ou `green` com `ok`; `impact` em `start + 0.6` do último beat. Ordenados por tempo.
+Cues: por item, `tick`, ou `red` com `crit`, ou `green` com `ok`; `impact` em `start + 0.6` do último beat. Ordenados por tempo. Sem som de abertura (pedido do dono no #684): a música entra com fade-in de 2 s. Não há som de transição entre beats (pedido do dono no #684): a transição é só visual.
 
 Saída `window.WF_SCRIPT = { variant, lang, duration, beats, cues, captions, link }`, com `kicker`, `title` e `items` traduzidos para o idioma da variante.
