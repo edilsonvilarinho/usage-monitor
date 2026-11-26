@@ -13,7 +13,7 @@ descrições. O padrão foi aprovado pelo dono no #540 e **não muda por tema**:
 | Visual | Modelo 01 Horizonte de eventos (`assets/scene.js`), design system do projeto |
 | Voz | `elevenlabs/eleven-v4`: `matilda` (PT), `george` (EN), pela OpenRouter, via harness do opencode |
 | Trilha | Pulso de sonda, sintetizada em `scripts/audio.py`, sem amostra de terceiros |
-| Plataformas | TikTok e Shorts (PT, 9:16, 1 min), LinkedIn (PT, 16:9, 1 min), X (EN, 16:9, 1 min), YouTube (PT e EN, 16:9, 5 min) |
+| Plataformas | TikTok e Shorts (PT, 9:16, 1 min), LinkedIn (PT, 16:9, 5 min), X (EN, 16:9, 5 min), YouTube (PT e EN, 16:9, 5 min) |
 
 Vídeo novo é **dado, não código**: só muda o `video.json` (contrato em [`references/video-spec.md`](references/video-spec.md)).
 Pedido de outro visual, voz ou trilha é mudança da skill, com protótipos antes; nunca ajuste no meio de um vídeo.
@@ -62,6 +62,7 @@ imagens). Mídia fica fora: `build/social-video/<slug>/` e `~/Videos/usage-monit
 | Regra | Por quê |
 |---|---|
 | Velocidade da voz nunca muda | Pedido do dono no #503 e no #540; o conserto é cortar texto |
+| Sem som de transição | Pedido do dono no #684 |
 | Sigla escrita ≠ falada | `say` e `toSpoken` cuidam da voz; a legenda usa o texto escrito |
 | Sem nome de filme, compositor ou logotipo de terceiro | Direitos autorais; prompt de trilha é descritivo |
 | Dado na cena vem de `facts` | Número inventado em vídeo público não tem conserto depois de postado |

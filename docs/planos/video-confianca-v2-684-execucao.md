@@ -41,6 +41,7 @@ transições sem som. O dono recusou o de 60 s por quatro motivos: conteúdo ras
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | `gh issue create`, `git worktree add` | issue #684; worktree com base em `9983593e` |
+| A02 | `node --test ".claude/skills/usage-monitor-social-video/scripts/test/*.test.mjs"` | vermelho: `✖ cues: rise em 0, sem whoosh, itens por status, impact no último beat, ordenados` (`AssertionError`), pass 44, fail 5 (cues e `VARIANTS`); verde 49/49. A02b (teto falado somado por idioma, antes só por beat: o `check` aceitou 5398 caracteres no longo): vermelho `regra 5: o teto vale para o total` `0 !== 1` (`spec.test.mjs:109`), verde 50/50; conferido de novo pelo `test-runner`: 50/50. `grep whoosh` na skill: nenhum. Transições: câmera 1,2 → 2,0 s, título 0,8/0,6 → 1,2/1,0 s, imagem 0,6 → 1,0 s |
 
 ## Problemas em aberto e riscos
 

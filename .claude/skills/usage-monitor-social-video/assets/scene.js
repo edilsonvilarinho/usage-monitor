@@ -156,7 +156,7 @@ WF.register({
       const { index, p } = beatAt(t)
       const cur = poseOf(index)
       const pre = index > 0 ? poseOf(index - 1) : cur
-      const tr = easeInOut(span(t, beats[index].start, 1.2))
+      const tr = easeInOut(span(t, beats[index].start, 2.0))
       const L = (key) => pre[key] + (cur[key] - pre[key]) * tr
       const within = easeInOut(p)
       return {
@@ -280,12 +280,6 @@ WF.register({
     }
     const drawWaves = (t) => {
       ctx.lineWidth = 3
-      for (const age of recent('whoosh', t, 1.0)) {
-        ctx.strokeStyle = rgba(COL.lens, 0.3 * (1 - age))
-        ctx.beginPath()
-        ctx.arc(0, 0, RS * (1.05 + 1.9 * easeOut(age)), 0, Math.PI * 2)
-        ctx.stroke()
-      }
       ctx.lineWidth = 2
       for (const age of recent('rise', t, 1.4)) {
         const k = age / 1.4
@@ -580,7 +574,7 @@ WF.register({
       const fb = FRAME[idx]
       if (!img || !fb) return
       const beat = beats[idx]
-      const a = smooth(span(t, beat.start, 0.6)) * (1 - smooth(span(t, beat.end - 0.6, 0.6)))
+      const a = smooth(span(t, beat.start, 1.0)) * (1 - smooth(span(t, beat.end - 1.0, 1.0)))
       if (a <= 0.002) return
       const p = clamp((t - beat.start) / (beat.end - beat.start))
       const s = 1 + 0.04 * p
@@ -615,7 +609,7 @@ WF.register({
     const drawTitle = (idx, t) => {
       const beat = beats[idx]
       const tb = TB[idx]
-      const a = smooth(span(t, beat.start, 0.8)) * (1 - smooth(span(t, beat.end - 0.6, 0.6)))
+      const a = smooth(span(t, beat.start, 1.2)) * (1 - smooth(span(t, beat.end - 1.0, 1.0)))
       if (a <= 0.002) return
       ctx.globalAlpha = a
       ctx.fillStyle = rgba(COL.night, 0.7)

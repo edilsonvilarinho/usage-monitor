@@ -92,13 +92,31 @@ test('regra 5: teto falado de 650 (curto) e 3500 (longo); a mensagem diz quanto 
     const longErrors = check(
         spec({ beats: [beat('abertura', { long: { pt: 'a'.repeat(3501), en: 'b'.repeat(3500) } }), beat('fluxo'), closing()] }),
     )
-    assert.equal(longErrors.length, 1, longErrors.join('\n'))
     has(longErrors, 'beat "abertura" long.pt: 3501 caracteres falados; cortar 1 (máximo 3500)')
     const shortErrors = check(
         spec({ beats: [beat('abertura', { short: { pt: 'a'.repeat(651), en: 'b'.repeat(650) } }), beat('fluxo'), closing()] }),
     )
-    assert.equal(shortErrors.length, 1, shortErrors.join('\n'))
     has(shortErrors, 'beat "abertura" short.pt: 651 caracteres falados; cortar 1 (máximo 650)')
+})
+
+test('regra 5: o teto vale para o total por tipo e idioma, nao so por beat', () => {
+    const longBeats = [...Array(15)].map((_, i) =>
+        i === 14
+            ? closing({ long: { pt: 'x'.repeat(300), en: 'y'.repeat(20) } })
+            : beat(String.fromCharCode(97 + i), { long: { pt: 'x'.repeat(300), en: 'y'.repeat(20) } }),
+    )
+    const longErrors = check(spec({ beats: longBeats }))
+    assert.equal(longErrors.length, 1, longErrors.join('\n'))
+    has(longErrors, 'long.pt: 4500 caracteres falados; cortar 1000 (máximo 3500)')
+
+    const shortBeats = [...Array(15)].map((_, i) =>
+        i === 14
+            ? closing({ short: { pt: 'x'.repeat(50), en: 'y'.repeat(20) } })
+            : beat(String.fromCharCode(97 + i), { short: { pt: 'x'.repeat(50), en: 'y'.repeat(20) } }),
+    )
+    const shortErrors = check(spec({ beats: shortBeats }))
+    assert.equal(shortErrors.length, 1, shortErrors.join('\n'))
+    has(shortErrors, 'short.pt: 750 caracteres falados; cortar 100 (máximo 650)')
 })
 
 test('regra 6: items ate 8; pt e en ate 44, ou 90 quando mono; status ok ou crit', () => {
@@ -215,8 +233,6 @@ test('VARIANTS segue a tabela e gera os nomes de saida', () => {
         VARIANTS.map((v) => [v.variant, v.format]),
         [
             ['short-pt', '9:16'],
-            ['short-pt', '16:9'],
-            ['short-en', '16:9'],
             ['long-pt', '16:9'],
             ['long-en', '16:9'],
         ],
@@ -225,16 +241,23 @@ test('VARIANTS segue a tabela e gera os nomes de saida', () => {
         'fluxo-agentico-tiktok-pt.mp4',
         'fluxo-agentico-shorts-pt.mp4',
         'fluxo-agentico-linkedin-pt.mp4',
-        'fluxo-agentico-x-en.mp4',
         'fluxo-agentico-youtube-pt.mp4',
+        'fluxo-agentico-x-en.mp4',
         'fluxo-agentico-youtube-en.mp4',
     ])
+})
+
+test('LinkedIn e X usam o corte longo em 16:9; nenhuma variante curta em 16:9', () => {
+    const files = (variant, format) => VARIANTS.filter((v) => v.variant === variant && v.format === format).flatMap((v) => v.files)
+    assert.deepEqual(files('long-pt', '16:9'), ['linkedin-pt', 'youtube-pt'])
+    assert.deepEqual(files('long-en', '16:9'), ['x-en', 'youtube-en'])
+    assert.ok(!VARIANTS.some((v) => v.kind === 'short' && v.format === '16:9'))
 })
 
 test('VARIANTS usa matilda em PT e george em EN, no mesmo modelo', () => {
     assert.deepEqual(
         VARIANTS.map((v) => v.voice),
-        ['matilda', 'matilda', 'george', 'matilda', 'george'],
+        ['matilda', 'matilda', 'george'],
     )
     assert.ok(VARIANTS.every((v) => v.model === 'elevenlabs/eleven-v4'))
 })

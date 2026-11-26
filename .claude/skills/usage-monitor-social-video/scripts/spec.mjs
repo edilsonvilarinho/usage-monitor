@@ -84,10 +84,8 @@ const variant = (name, lang, kind, format, files) => ({
 // Tabela "Variantes e plataformas". files: sufixo de cada arquivo, sem slug nem .mp4.
 export const VARIANTS = Object.freeze([
     variant('short-pt', 'pt', 'short', '9:16', ['tiktok-pt', 'shorts-pt']),
-    variant('short-pt', 'pt', 'short', '16:9', ['linkedin-pt']),
-    variant('short-en', 'en', 'short', '16:9', ['x-en']),
-    variant('long-pt', 'pt', 'long', '16:9', ['youtube-pt']),
-    variant('long-en', 'en', 'long', '16:9', ['youtube-en']),
+    variant('long-pt', 'pt', 'long', '16:9', ['linkedin-pt', 'youtube-pt']),
+    variant('long-en', 'en', 'long', '16:9', ['x-en', 'youtube-en']),
 ])
 
 // Devolve a lista de erros; cada um nomeia o beat e o campo. Nao para no primeiro.
@@ -218,6 +216,19 @@ export function validateSpec(spec, { fileExists } = {}) {
             }
         }
     })
+
+    // Regra 5 no total: soma por tipo e idioma, so beats que tem o texto
+    for (const kind of ['short', 'long']) {
+        for (const lang of LANGS) {
+            const total = beats.reduce((sum, raw) => {
+                const entry = raw?.[kind]
+                if (entry == null || !filled(entry[lang])) return sum
+                return sum + len(toSpoken(entry[lang], lang, entry.say))
+            }, 0)
+            const max = SPOKEN_MAX[kind]
+            if (total > max) err(`${kind}.${lang}: ${total} caracteres falados; cortar ${total - max} (máximo ${max})`)
+        }
+    }
 
     return errors
 }

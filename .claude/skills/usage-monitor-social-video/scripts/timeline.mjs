@@ -11,7 +11,6 @@ const BEAT_LEAD_MS = 400 // beat começa 0,4 s antes da fala
 const ITEM_HEAD_MS = 300 // primeiro item: speechStart + 0,3 s
 const ITEM_TAIL_MS = 600 // último item: speechEnd - 0,6 s
 const SHORT_ITEM_CAP = 4 // no curto, sem nenhum item marcado: até 4
-const WHOOSH_LEAD_MS = 300 // whoosh 0,3 s antes do beat
 const IMPACT_AFTER_LAST_MS = 600 // impact em start do último beat + 0,6 s
 const MAX_CHARS = 72
 
@@ -170,17 +169,16 @@ export function timeCaptions(text, speechStart, speechEnd) {
   })
 }
 
-// Cues ordenadas: rise em 0; whoosh antes de cada beat exceto o primeiro;
-// um som por item (tick, red com crit, green com ok); impact em 0,6 s do último beat.
+// Cues ordenadas: rise em 0; um som por item (tick, red com crit, green com ok);
+// impact em 0,6 s do último beat. Sem som de transição entre beats.
 export function buildCues(beats) {
   if (!beats.length) return []
   const raw = [{ tMs: 0, sound: 'rise', note: beats[0].id }]
-  beats.forEach((b, i) => {
+  beats.forEach((b) => {
     for (const it of b.items) {
       const sound = it.status === 'crit' ? 'red' : it.status === 'ok' ? 'green' : 'tick'
       raw.push({ tMs: toMs(it.at), sound, note: `${b.id}: ${it.text}` })
     }
-    if (i > 0) raw.push({ tMs: toMs(b.start) - WHOOSH_LEAD_MS, sound: 'whoosh', note: `transição ${b.id}` })
   })
   const last = beats[beats.length - 1]
   raw.push({ tMs: toMs(last.start) + IMPACT_AFTER_LAST_MS, sound: 'impact', note: 'merge' })
