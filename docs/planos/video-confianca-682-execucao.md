@@ -36,3 +36,4 @@ Cada número do vídeo está em `video-confianca-644/video.json` (`facts`) e foi
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | `sed -n` nas linhas citadas acima | 11 números conferidos; 1 divergência do explorer corrigida (#650: 10/10) |
+| A02 | `make.mjs check` e `make.mjs preview` em `video-confianca-644/video.json` | curto PT 622 e EN 615 caracteres falados (teto 630), longo PT 3358 e EN 3247; prévia 60 s, `gap` 1,24 s (PT) e 1,33 s (EN); folha `build/social-video/confianca-644/qa/sheet.jpg` sem texto cortado nem sobreposição; post do X 245 de 280 |
