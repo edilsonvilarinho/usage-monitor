@@ -10,10 +10,10 @@ descrições. O padrão foi aprovado pelo dono no #540 e **não muda por tema**:
 
 | Item | Padrão |
 |---|---|
-| Visual | Modelo 01 Horizonte de eventos (`assets/scene.js`), design system do projeto |
+| Visual | Longo: cena "explica" (`assets/scene-explica.js`, `"scene": "explica"`), design em [`references/visual-explica.md`](references/visual-explica.md). Curto: Modelo 01 Horizonte de eventos (`assets/scene.js`) |
 | Voz | `elevenlabs/eleven-v4`: `matilda` (PT), `george` (EN), pela OpenRouter, via harness do opencode |
 | Trilha | Pulso de sonda, sintetizada em `scripts/audio.py`, sem amostra de terceiros |
-| Plataformas | TikTok e Shorts (PT, 9:16, 1 min), LinkedIn (PT, 16:9, 5 min), X (EN, 16:9, 5 min), YouTube (PT e EN, 16:9, 5 min) |
+| Plataformas | TikTok e Shorts (PT, 9:16, 1 min), LinkedIn (PT, 16:9), X (EN, 16:9), YouTube (PT e EN, 16:9); o longo tem 5 min, ou 10 min com `longSeconds` 600. X acima de 2 min 20 s exige conta Premium |
 
 Vídeo novo é **dado, não código**: só muda o `video.json` (contrato em [`references/video-spec.md`](references/video-spec.md)).
 Pedido de outro visual, voz ou trilha é mudança da skill, com protótipos antes; nunca ajuste no meio de um vídeo.
@@ -26,15 +26,17 @@ imagens). Mídia fica fora: `build/social-video/<slug>/` e `~/Videos/usage-monit
 1. **Material.** Tema e fontes. Número, nome ou afirmação só entra com origem: o que o dono mandou ou o que você mediu com
    comando. Se faltar dado, pergunte; nunca complete. Olhe cada imagem: credencial, e-mail ou dado pessoal visível bloqueia o uso.
 2. **Roteiro.** Escreva `video.json` e, a partir dele, `roteiro.md` com as duas versões. Um roteiro que só cita etapas foi recusado
-   pelo dono: **cada etapa diz o que acontece e como**, com o artefato real em tela.
+   pelo dono: **cada etapa diz o que acontece e como**, com o artefato real em tela. Ordem de cada parte: problema, conceito, como
+   foi feito e exemplo real. Na cena "explica", o exemplo é sempre visível: captura do app com `markers`, trecho de código com
+   `code.highlight` e `diagram`, ou cartões. Cada `at` é um trecho literal da fala.
    - **Curto:** teto medido de 630 caracteres por idioma (12,2 caracteres/s); cada fala tem uma ação e um porquê.
-   - **Longo:** até 3400 caracteres, no máximo 15 etapas, cada uma com 2 a 4 frases, abrindo com o contexto e fechando com um caso real.
+   - **Longo:** até 3500 caracteres em 300 s (7000 em `longSeconds` 600), no máximo 20 etapas (30 em 600 s), cada uma com 2 a 4 frases, abrindo com o contexto e fechando com um caso real.
    - Fala curta, sem jargão desnecessário; `facts` lista todo número usado.
-3. **Conferência.** `node <skill>/scripts/make.mjs check <video.json>`. Erro de teto se resolve cortando texto, nunca acelerando voz.
+3. **Conferência.** `node <skill>/scripts/make.mjs check <video.json>`. Erro de teto se resolve cortando texto, nunca acelerando voz. Beat com `code` mostra um trecho de arquivo do repo (contrato em `references/video-spec.md`, Código).
 4. **Prévia, sem gastar API.** `node <skill>/scripts/make.mjs preview <video.json>`: gera linha do tempo estimada e quadros em
    `build/social-video/<slug>/qa/`, com folha de contato `sheet.jpg`. **Olhe a folha você mesmo**: texto cortado, sobreposição, imagem
-   ilegível ou faixa de legenda invadida voltam para o `video.json`.
-5. **Parada obrigatória.** Mande `roteiro.md` e a folha ao dono e espere o ok. Nada de voz nem render antes: render longo custa
+   ilegível, faixa de legenda invadida, código cortado ou balão sobre o código voltam para o `video.json` ou para a cena. A prévia também grava `qa/player-<variante>.html`, uma cena jogável com lista de beats; abra-a por `make.mjs serve <video.json>` (URL impressa), porque `file://` bloqueia o iframe.
+5. **Parada obrigatória.** Mande ao dono `roteiro.md`, a folha e o link da prévia jogável, e espere o ok. Nada de voz nem render antes: render longo custa
    cerca de 14 minutos por idioma, e o dono já recusou roteiro depois do visual aprovado.
 6. **Chave.** Peça a chave só agora, se não veio. Grave em arquivo temporário fora do repositório e passe por variável de ambiente.
    Nunca em comando impresso, log, `video.json` ou commit. Ao terminar, apague o arquivo e diga ao dono para revogar.
@@ -62,7 +64,12 @@ imagens). Mídia fica fora: `build/social-video/<slug>/` e `~/Videos/usage-monit
 | Regra | Por quê |
 |---|---|
 | Velocidade da voz nunca muda | Pedido do dono no #503 e no #540; o conserto é cortar texto |
-| Sem som de transição | Pedido do dono no #684 |
+| Sem som de transição nem de abertura | Pedido do dono no #684: o `whoosh` e o `rise` saíram |
+| Mostrar o que a fala cita | #686: conceito sem artefato na tela foi recusado; use `markers`, `code.highlight` e `diagram` |
+| Nada se mexe depois de entrar | #686: rótulos presos a pontos do anel giravam; texto entra uma vez e fica |
+| Buraco negro grande só na abertura | #686: crescer e encolher a cada tópico foi recusado; ele fica no canto e anima sempre |
+| Visual novo começa em protótipo HTML | #686: três direções, escolha do dono, ajustes no protótipo; só depois a cena da skill |
+| Medir texto só com a fonte carregada | #686: a Plex Mono 400 carregava depois do `mount`, e o balão cobria a linha de código |
 | Sigla escrita ≠ falada | `say` e `toSpoken` cuidam da voz; a legenda usa o texto escrito |
 | Sem nome de filme, compositor ou logotipo de terceiro | Direitos autorais; prompt de trilha é descritivo |
 | Dado na cena vem de `facts` | Número inventado em vídeo público não tem conserto depois de postado |

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Prévia do vídeo social</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; height: 100vh; display: flex; flex-direction: column; background: #141414; color: #E6E1E1; font: 14px/1.4 "IBM Plex Sans", system-ui, sans-serif; }
+  header { padding: 10px 16px; color: #7A7373; font-size: 13px; border-bottom: 1px solid #3D3838; }
+  main { flex: 1; display: flex; min-height: 0; }
+  #stage { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 12px; }
+  #box { position: relative; overflow: hidden; background: #000; border-radius: 8px; }
+  #scene { position: absolute; left: 0; top: 0; border: 0; transform-origin: 0 0; }
+  aside { width: 420px; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid #3D3838; }
+  #beats { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+  #beats li { padding: 10px 14px; border-bottom: 1px solid #2a2626; cursor: pointer; }
+  #beats li:hover { background: #1d1b1b; }
+  #beats li.on { background: #2a2424; box-shadow: inset 3px 0 0 #FAB283; }
+  .k { color: #7A7373; font: 11px "IBM Plex Mono", monospace; letter-spacing: .04em; text-transform: uppercase; }
+  .t { font-weight: 600; margin: 2px 0 4px; }
+  .x { color: #cfc8c8; font-size: 13px; white-space: pre-wrap; }
+  footer { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px solid #3D3838; }
+  button { background: #1d1b1b; color: #E6E1E1; border: 1px solid #3D3838; border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; }
+  button:hover { border-color: #FAB283; }
+  input[type=range] { flex: 1; accent-color: #FAB283; }
+  #clock { min-width: 120px; text-align: right; color: #7A7373; font: 13px "IBM Plex Mono", monospace; }
+  #err { padding: 8px 16px; color: #ff8a80; }
+</style>
+</head>
+<body>
+<header id="head"></header>
+<main>
+  <div id="stage"><div id="box"><iframe id="scene" title="cena"></iframe></div></div>
+  <aside><ol id="beats"></ol></aside>
+</main>
+<footer>
+  <button id="prev" type="button">Anterior</button>
+  <button id="play" type="button">Tocar</button>
+  <button id="next" type="button">Próximo</button>
+  <input id="seek" type="range" min="0" step="0.01" value="0">
+  <span id="clock"></span>
+</footer>
+<div id="err" hidden></div>
+<script>
+window.PLAYER = /*__PLAYER_JSON__*/null;
+(function () {
+  // beatAt igual a beatIndexAt de scripts/player.mjs.
+  var P = window.PLAYER;
+  var $ = function (id) { return document.getElementById(id); };
+  var frame = $('scene'), box = $('box'), list = $('beats'), seek = $('seek'), playBtn = $('play');
+  var beats = P.beats, dur = P.duration;
+  var t = 0, playing = false, ready = false, startT = 0, startedAt = 0, shown = -1, tries = 0;
+
+  function fmt(s) { var m = Math.floor(s / 60), r = s - m * 60; return m + ':' + (r < 10 ? '0' : '') + r.toFixed(1); }
+  function beatAt(time) {
+    if (!beats.length) return -1;
+    if (!(time >= beats[0].start)) return 0;
+    for (var i = 0; i < beats.length; i++) if (time < beats[i].end) return i;
+    return beats.length - 1;
+  }
+  function fail(message) { var e = $('err'); e.textContent = message; e.hidden = false; }
+  function fit() {
+    var stage = $('stage');
+    var s = Math.min((stage.clientWidth - 24) / P.w, (stage.clientHeight - 24) / P.h);
+    box.style.width = Math.floor(P.w * s) + 'px';
+    box.style.height = Math.floor(P.h * s) + 'px';
+    frame.style.width = P.w + 'px';
+    frame.style.height = P.h + 'px';
+    frame.style.transform = 'scale(' + s + ')';
+  }
+  function draw() {
+    if (!ready) return;
+    frame.contentWindow.renderAt(t);
+    seek.value = t;
+    $('clock').textContent = fmt(t) + ' / ' + fmt(dur);
+    var cur = beatAt(t);
+    for (var k = 0; k < list.children.length; k++) list.children[k].classList.toggle('on', k === cur);
+    if (cur >= 0 && cur !== shown) { shown = cur; list.children[cur].scrollIntoView({ block: 'nearest' }); }
+  }
+  function go(time) {
+    t = Math.max(0, Math.min(dur, time));
+    if (playing) { startT = t; startedAt = performance.now(); }
+    draw();
+  }
+  function tick() {
+    if (!playing) return;
+    t = startT + (performance.now() - startedAt) / 1000;
+    if (t >= dur) { t = dur; playing = false; playBtn.textContent = 'Tocar'; }
+    draw();
+    if (playing) requestAnimationFrame(tick);
+  }
+  function poll() {
+    tries += 1;
+    try {
+      var w = frame.contentWindow;
+      if (w && w.__error) return fail('cena: ' + w.__error);
+      if (w && w.__ready === true && typeof w.renderAt === 'function') {
+        ready = true;
+        draw();
+        return;
+      }
+    } catch (err) {
+      return fail('a cena não abre por file://; sirva o repositório com make.mjs serve (' + err.message + ')');
+    }
+    if (tries > 300) return fail('a cena não ficou pronta em 30 s');
+    setTimeout(poll, 100);
+  }
+
+  $('head').textContent = P.title + ' · ' + P.variant + ' · ' + fmt(dur) + ' estimados, sem áudio';
+  seek.max = dur;
+  beats.forEach(function (b) {
+    var li = document.createElement('li');
+    var k = document.createElement('div'); k.className = 'k'; k.textContent = b.kicker + '  ·  ' + fmt(b.start);
+    var title = document.createElement('div'); title.className = 't'; title.textContent = b.title;
+    var text = document.createElement('div'); text.className = 'x'; text.textContent = b.text;
+    li.appendChild(k); li.appendChild(title); li.appendChild(text);
+    li.onclick = function () { go(b.start); };
+    list.appendChild(li);
+  });
+  playBtn.onclick = function () {
+    if (playing) { playing = false; playBtn.textContent = 'Tocar'; draw(); return; }
+    if (t >= dur) t = 0;
+    playing = true;
+    playBtn.textContent = 'Pausar';
+    startT = t;
+    startedAt = performance.now();
+    requestAnimationFrame(tick);
+  };
+  $('prev').onclick = function () { go(beats[Math.max(0, beatAt(t) - 1)].start); };
+  $('next').onclick = function () { go(beats[Math.min(beats.length - 1, beatAt(t) + 1)].start); };
+  seek.oninput = function () { go(parseFloat(seek.value)); };
+  window.onresize = fit;
+  fit();
+  frame.onload = poll;
+  frame.src = P.src;
+})();
+</script>
+</body>
+</html>

@@ -337,3 +337,24 @@ test('buildScript: cues ordenadas, sem som de abertura, só sons de item, impact
 test('buildScript sem duração de um beat lança erro citando o beat', () => {
   assert.throws(() => buildScript(SPEC, 'short', 'pt', { abertura: 10, passo: 10 }), /fecho/)
 })
+
+// ---------- longSeconds: alvo do corte longo (A03a, #686) ----------
+
+const LONG600 = { ...SPEC, longSeconds: 600 }
+// 4 falas de 147 s = 588 s: com alvo 600 s o gap fica em 2,67 s (abaixo do teto), e a duração é o alvo.
+const LONG_588 = { abertura: 147, meio: 147, passo: 147, fecho: 147 }
+
+test('longo com longSeconds 600 mira 600 s; o mesmo roteiro com 300 não cabe', () => {
+  const s = buildScript(LONG600, 'long', 'pt', LONG_588)
+  assert.equal(s.duration, 600)
+  assert.equal(s.beats.at(-1).end, 600)
+  assert.throws(() => buildScript(SPEC, 'long', 'pt', LONG_588), /0,8 s/)
+})
+
+test('longo com longSeconds 600 e gap no teto: duração é a última fala mais a cauda de 3,0 s', () => {
+  assert.equal(buildScript(LONG600, 'long', 'pt', LONG_DUR).duration, 53)
+})
+
+test('curto não muda com longSeconds: alvo 60 s e cauda 0,6 s', () => {
+  assert.equal(buildScript(LONG600, 'short', 'pt', SHORT_DUR).duration, 37.6)
+})

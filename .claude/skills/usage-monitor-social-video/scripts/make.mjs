@@ -9,20 +9,26 @@
 import { execFileSync, spawn } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { parseArgs } from 'node:util'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import vm from 'node:vm'
 import { VARIANTS, outputNames, toSpoken, validateSpec } from './spec.mjs'
 import { buildScript, toSrt } from './timeline.mjs'
 import { estimateDuration, segmentName, synthesize } from './voice.mjs'
 import { toolPaths } from '../../usage-monitor-release-video/scripts/setup-tools.mjs'
+import { FORMATS, launch } from './browser.mjs'
+import { buildPlayerHtml, playerBeats, playerSrc, writtenTexts } from './player.mjs'
+import { createRepoServer } from './serve.mjs'
+import { codeCardData, codeExcerpt } from './code-card.mjs'
+import { renderCodeCard } from './code-render.mjs'
 
 const SCRIPTS = dirname(fileURLToPath(import.meta.url))
+const ASSETS = join(SCRIPTS, '..', 'assets')
 const VOICE_CONCURRENCY = 3
 const RENDER_CONCURRENCY = 2
-const COMMANDS = ['check', 'preview', 'voice', 'render']
-const USAGE = 'uso: node scripts/make.mjs <check|preview|voice|render> <video.json> [--only <variante>] [--to <s>] [--silent]'
+const COMMANDS = ['check', 'stage', 'preview', 'serve', 'voice', 'render']
+const USAGE = 'uso: node scripts/make.mjs <check|stage|preview|serve|voice|render> <video.json> [--only <variante>] [--to <s>] [--silent] [--port <porta>]'
 // Mesma faixa de loudnorm da voz: I=-16 (fala), TP=-1.5.
 const VOICE_LOUDNORM = 'loudnorm=I=-16:TP=-1.5:LRA=11'
 // Quadros de QA: short-pt em 9:16 e long-pt em 16:9 (stills.mjs).
@@ -91,7 +97,7 @@ function findImage(videoDir, image) {
 }
 
 // Copia as imagens para <work>/images/ e devolve { beatId: 'images/<arquivo>' }, relativo ao <variante>.js.
-function stageImages(spec, videoDir, work) {
+async function stageImages(spec, videoDir, work) {
   const dir = join(work, 'images')
   mkdirSync(dir, { recursive: true })
   const map = {}
@@ -100,6 +106,35 @@ function stageImages(spec, videoDir, work) {
     const name = `${beat.id}-${basename(beat.image)}`
     copyFileSync(findImage(videoDir, beat.image), join(dir, name))
     map[beat.id] = `images/${name}`
+  }
+  // Beat com code: PNG do trecho de código (cartão em code-render.mjs), no mesmo diretório de imagens.
+  // Na cena explica o código vai ao vivo no quadro (code.lines), sem PNG; a cena antiga segue com o PNG.
+  const codeBeats = spec.scene === 'explica' ? [] : spec.beats.filter((beat) => beat.code)
+  if (codeBeats.length) {
+    const fontsDir = join(repoRoot(), 'src', 'desktopMain', 'resources', 'fonts')
+    const fonts = {
+      regular: pathToFileURL(join(fontsDir, 'IBMPlexMono-Regular.ttf')).href,
+      medium: pathToFileURL(join(fontsDir, 'IBMPlexMono-Medium.ttf')).href,
+    }
+    mkdirSync(join(work, 'code'), { recursive: true })
+    const browser = await launch()
+    try {
+      for (const beat of codeBeats) {
+        const { file, from, to } = beat.code
+        const lines = codeExcerpt(readFileSync(join(repoRoot(), file), 'utf8'), from, to)
+        const name = `${beat.id}-code.png`
+        const { font } = await renderCodeCard(browser, {
+          fonts,
+          data: codeCardData({ file, from, to, lines }),
+          htmlFile: join(work, 'code', `${beat.id}.html`),
+          out: join(dir, name),
+        })
+        console.log(`codigo ${beat.id}: fonte ${font} px`)
+        map[beat.id] = `images/${name}`
+      }
+    } finally {
+      await browser.close()
+    }
   }
   return map
 }
@@ -124,11 +159,56 @@ function probeSeconds(file) {
   return seconds
 }
 
+// Linhas brutas do trecho de cada beat com code, lidas do arquivo real (buildScript tira a indentação comum).
+function codeLinesOf(spec) {
+  const lines = {}
+  for (const beat of spec.beats) {
+    if (!beat.code) continue
+    const { file, from, to } = beat.code
+    lines[beat.id] = codeExcerpt(readFileSync(join(repoRoot(), file), 'utf8'), from, to)
+  }
+  return lines
+}
+
 // Roteiro com duracao estimada por caracteres (preview).
 function previewScript(spec, row) {
   const durations = {}
   for (const beat of sourceBeats(spec, row.kind)) durations[beat.id] = estimateDuration(spokenOf(beat, row.kind, row.lang))
-  return buildScript(spec, row.kind, row.lang, durations)
+  return buildScript(spec, row.kind, row.lang, durations, { codeLines: codeLinesOf(spec) })
+}
+
+// Prévia jogável: qa/player-<variante>.html (iframe da cena, controles e lista de beats; sem áudio).
+function writePlayer(spec, work, row, script) {
+  const { w, h } = FORMATS[row.format]
+  const qa = join(work, 'qa')
+  mkdirSync(qa, { recursive: true })
+  const model = {
+    title: spec.slug,
+    variant: row.variant,
+    format: row.format,
+    w,
+    h,
+    duration: script.duration,
+    src: playerSrc({ fromDir: qa, indexFile: join(ASSETS, 'index.html'), dataFile: join(work, `${row.variant}.js`), format: row.format }),
+    beats: playerBeats(script, writtenTexts(spec, row.kind, row.lang)),
+  }
+  const file = join(qa, `player-${row.variant}.html`)
+  writeFileSync(file, buildPlayerHtml(readFileSync(join(ASSETS, 'player.html'), 'utf8'), model), 'utf8')
+  return file
+}
+
+// Sirve o repositório em 127.0.0.1 (so GET), para a prévia abrir no Chrome com o iframe da cena na mesma origem.
+function serve(spec, port) {
+  const root = repoRoot()
+  const work = join(root, 'build', 'social-video', spec.slug)
+  const files = VARIANTS.map((row) => join(work, 'qa', `player-${row.variant}.html`)).filter((file) => existsSync(file))
+  if (!files.length) stop(`nenhuma previa em ${join(work, 'qa')}; rode make.mjs preview antes`)
+  const server = createRepoServer(root)
+  server.listen(Number(port ?? 8765), '127.0.0.1', () => {
+    const base = `http://127.0.0.1:${server.address().port}`
+    for (const file of files) console.log(`${base}/${relative(root, file).split(sep).join('/')}`)
+  })
+  return 0
 }
 
 async function preview(spec, work, images, rows) {
@@ -139,6 +219,7 @@ async function preview(spec, work, images, rows) {
     writeFileSync(join(work, `${row.variant}.srt`), toSrt(script.captions), 'utf8')
     scripts[row.variant] = script
     console.log(`${row.variant}: ${script.duration} s estimados, ${script.beats.length} beats, gap ${gapOf(script)} s`)
+    console.log(`previa jogavel: ${writePlayer(spec, work, row, script)}`)
   }
   const qa = join(work, 'qa')
   mkdirSync(qa, { recursive: true })
@@ -197,7 +278,7 @@ async function voice(spec, work, images, rows) {
   for (const { row, beats } of plan) {
     const durations = {}
     for (const beat of beats) durations[beat.id] = probeSeconds(beat.file)
-    const script = buildScript(spec, row.kind, row.lang, durations)
+    const script = buildScript(spec, row.kind, row.lang, durations, { codeLines: codeLinesOf(spec) })
     writeData(join(work, `${row.variant}.js`), script, images)
     writeFileSync(join(work, `${row.variant}.srt`), toSrt(script.captions), 'utf8')
     await buildVoiceWav(
@@ -249,6 +330,7 @@ async function main() {
       only: { type: 'string' },
       to: { type: 'string' },
       silent: { type: 'boolean', default: false },
+      port: { type: 'string' },
     },
   })
   const [command, videoArg] = positionals
@@ -257,7 +339,15 @@ async function main() {
   if (!existsSync(videoFile)) stop(`video.json ausente: ${videoFile}`)
   const spec = JSON.parse(readFileSync(videoFile, 'utf8'))
   const videoDir = dirname(videoFile)
-  const errors = validateSpec(spec, { fileExists: (p) => findImage(videoDir, p) !== null })
+  // Texto de arquivo relativo à raiz do repo (regra do code); null se não existe.
+  const readText = (p) => {
+    try {
+      return readFileSync(resolve(repoRoot(), p), 'utf8')
+    } catch {
+      return null
+    }
+  }
+  const errors = validateSpec(spec, { fileExists: (p) => findImage(videoDir, p) !== null, readText })
   if (errors.length) {
     for (const error of errors) console.error(`- ${error}`)
     return 1
@@ -286,9 +376,14 @@ async function main() {
     if (!(Number.isFinite(to) && to > 0)) stop('--to pede segundos maiores que zero')
   }
 
+  if (command === 'serve') return serve(spec, values.port)
   const work = join(repoRoot(), 'build', 'social-video', spec.slug)
   mkdirSync(work, { recursive: true })
-  const images = stageImages(spec, videoDir, work)
+  const images = await stageImages(spec, videoDir, work)
+  if (command === 'stage') {
+    for (const beat of spec.beats) if (images[beat.id]) console.log(`${beat.id}: ${join(work, images[beat.id])}`)
+    return 0
+  }
   if (command === 'preview') await preview(spec, work, images, uniqueRows(rows))
   if (command === 'voice') await voice(spec, work, images, uniqueRows(rows))
   if (command === 'render') await render(spec, work, rows, { to, silent: values.silent })
