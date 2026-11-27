@@ -4,6 +4,8 @@
 // Contas internas em milissegundos inteiros; a saída é em segundos com 3 casas.
 // Porta de prototipos/workflow-video-v3/final/build.mjs, sem leitura de arquivos.
 
+import { longSecondsOf } from './spec.mjs'
+
 const FIRST_MS = 1000 // primeira fala em 1,0 s
 const GAP_MIN_MS = 800 // gap mínimo entre falas
 const GAP_MAX_MS = 3000 // gap máximo entre falas
@@ -17,7 +19,7 @@ const MAX_CHARS = 72
 // Alvo e cauda por tipo de vídeo (video.json, seção "Linha do tempo"). Interno: a lista de variantes é spec.mjs VARIANTS.
 const TIMING = {
   short: { target: 60, tail: 0.6 },
-  long: { target: 300, tail: 3.0 },
+  long: { tail: 3.0 }, // alvo do longo: longSeconds (spec.mjs)
 }
 
 const toMs = (s) => Math.round(s * 1000)
@@ -199,8 +201,8 @@ export function toSrt(captions) {
 // durations: { [beatId]: segundos da fala medida }. No curto entram só beats com short.
 // Legendas usam o texto escrito (short/long), nunca a forma falada (say).
 export function buildScript(spec, kind, lang, durations) {
-  const variant = TIMING[kind]
-  if (!variant) throw new Error(`kind desconhecido: ${kind}`)
+  if (!TIMING[kind]) throw new Error(`kind desconhecido: ${kind}`)
+  const variant = kind === 'long' ? { target: longSecondsOf(spec), tail: TIMING.long.tail } : TIMING[kind]
   const isShort = kind === 'short'
   const source = spec.beats.filter((b) => !isShort || b.short)
 

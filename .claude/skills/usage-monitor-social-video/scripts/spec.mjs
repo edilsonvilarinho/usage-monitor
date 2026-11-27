@@ -3,18 +3,35 @@
 
 const LANGS = ['pt', 'en']
 const BEATS_MIN = 3
-const BEATS_MAX = 20
 const SHORT_MIN = 3
 const CLIMAX_MAX = 1
 const TITLE_MAX = 34
 const ITEMS_MAX = 8
 const ITEM_MAX = { plain: 44, mono: 90 }
 const IMAGE_ITEMS_MAX = 3
-const SPOKEN_MAX = { short: 650, long: 3500 }
+const SPOKEN_MAX_SHORT = 650
+const SPOKEN_MAX_LONG_AT_300 = 3500 // teto do longo em 300 s; em 600 s, 3500 × 600 / 300
 const SLUG_RE = /^[a-z0-9-]+$/
 const ID_RE = /^[a-z-]+$/
 const LINK_RE = /^https:\/\/\S+$/
 const IMAGE_EXT = /\.(png|jpe?g)$/i
+
+// Duração do corte longo (campo longSeconds, opcional). Padrão 300 s; 600 s é o outro valor permitido.
+export const LONG_SECONDS = Object.freeze([300, 600])
+const LONG_DEFAULT = 300
+const BEATS_MAX_BY_LONG = Object.freeze({ 300: 20, 600: 30 })
+
+// Teto de caracteres falados por idioma. Curto fixo; longo escala com longSeconds.
+export function spokenMax(kind, longSeconds = LONG_DEFAULT) {
+    return kind === 'short' ? SPOKEN_MAX_SHORT : (SPOKEN_MAX_LONG_AT_300 * longSeconds) / LONG_DEFAULT
+}
+
+// longSeconds efetivo do roteiro (padrão 300). Valor fora de 300/600 lança RangeError.
+export function longSecondsOf(spec) {
+    const value = spec?.longSeconds === undefined ? LONG_DEFAULT : spec.longSeconds
+    if (!LONG_SECONDS.includes(value)) throw new RangeError(`longSeconds: use 300 ou 600 (veio ${JSON.stringify(value)})`)
+    return value
+}
 
 const isStr = (value) => typeof value === 'string'
 const filled = (value) => isStr(value) && value.trim() !== ''
@@ -93,6 +110,12 @@ export function validateSpec(spec, { fileExists } = {}) {
     if (typeof fileExists !== 'function') throw new TypeError('validateSpec precisa de { fileExists }')
     const errors = []
     const err = (message) => errors.push(message)
+    // Valor inválido já sai como erro; os tetos usam o padrão para não repetir a falha.
+    const longRaw = spec?.longSeconds
+    const longValid = longRaw === undefined || LONG_SECONDS.includes(longRaw)
+    if (!longValid) err("longSeconds: use 300 ou 600")
+    const longSeconds = longValid && longRaw !== undefined ? longRaw : LONG_DEFAULT
+    const beatsMax = BEATS_MAX_BY_LONG[longSeconds]
     const beatsValid = Array.isArray(spec?.beats)
     const beats = beatsValid ? spec.beats : []
     const facts = Array.isArray(spec?.facts) ? spec.facts : []
@@ -115,7 +138,7 @@ export function validateSpec(spec, { fileExists } = {}) {
     // Regra 2
     if (!beatsValid) err('beats: precisa ser uma lista')
     else if (beats.length < BEATS_MIN) err(`beats: ${beats.length} beats; o mínimo é ${BEATS_MIN}`)
-    else if (beats.length > BEATS_MAX) err(`beats: ${beats.length} beats; o máximo é ${BEATS_MAX}`)
+    else if (beats.length > beatsMax) err(`beats: ${beats.length} beats; o máximo é ${beatsMax}`)
 
     // Regra 4 (contagem) e regra 8
     if (beatsValid) {
@@ -172,7 +195,7 @@ export function validateSpec(spec, { fileExists } = {}) {
                 secret(text, path)
                 numbers(text, path)
                 const spoken = len(toSpoken(text, lang, entry.say))
-                const max = SPOKEN_MAX[kind]
+                const max = spokenMax(kind, longSeconds)
                 if (spoken > max) err(`${path}: ${spoken} caracteres falados; cortar ${spoken - max} (máximo ${max})`)
             }
         }
@@ -225,7 +248,7 @@ export function validateSpec(spec, { fileExists } = {}) {
                 if (entry == null || !filled(entry[lang])) return sum
                 return sum + len(toSpoken(entry[lang], lang, entry.say))
             }, 0)
-            const max = SPOKEN_MAX[kind]
+            const max = spokenMax(kind, longSeconds)
             if (total > max) err(`${kind}.${lang}: ${total} caracteres falados; cortar ${total - max} (máximo ${max})`)
         }
     }

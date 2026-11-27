@@ -261,3 +261,35 @@ test('VARIANTS usa matilda em PT e george em EN, no mesmo modelo', () => {
     )
     assert.ok(VARIANTS.every((v) => v.model === 'elevenlabs/eleven-v4'))
 })
+
+// ---------- longSeconds: duração do corte longo (A03a, #686) ----------
+
+const beatsOf = (total, patch = {}) => [
+    ...Array.from({ length: total - 1 }, (_, i) => beat(`b${'-'.repeat(i)}`)),
+    closing(patch),
+]
+
+test('longSeconds: ausente, 300 ou 600 passam; outro valor é erro', () => {
+    assert.deepEqual(check(spec()), [])
+    assert.deepEqual(check(spec({ longSeconds: 300 })), [])
+    assert.deepEqual(check(spec({ longSeconds: 600 })), [])
+    has(check(spec({ longSeconds: 450 })), 'longSeconds: use 300 ou 600')
+    has(check(spec({ longSeconds: null })), 'longSeconds: use 300 ou 600')
+})
+
+test('longSeconds 600: teto falado do longo sobe para 7000; com 300 segue em 3500', () => {
+    const withLong = (n, longSeconds) => spec({
+        longSeconds,
+        beats: [beat('abertura', { long: { pt: 'a'.repeat(n), en: 'b'.repeat(n) } }), beat('fluxo'), closing()],
+    })
+    assert.deepEqual(check(withLong(3501, 600)), [])
+    has(check(withLong(7001, 600)), 'beat "abertura" long.pt: 7001 caracteres falados; cortar 1 (máximo 7000)')
+    has(check(withLong(3501)), 'beat "abertura" long.pt: 3501 caracteres falados; cortar 1 (máximo 3500)')
+})
+
+test('máximo de beats: 20 com longSeconds 300 (padrão) e 30 com 600', () => {
+    has(check(spec({ beats: beatsOf(21) })), 'beats: 21 beats; o máximo é 20')
+    assert.deepEqual(check(spec({ beats: beatsOf(20) })), [])
+    has(check(spec({ longSeconds: 600, beats: beatsOf(31) })), 'beats: 31 beats; o máximo é 30')
+    assert.deepEqual(check(spec({ longSeconds: 600, beats: beatsOf(30) })), [])
+})

@@ -28,7 +28,7 @@ imagens). Mídia fica fora: `build/social-video/<slug>/` e `~/Videos/usage-monit
 2. **Roteiro.** Escreva `video.json` e, a partir dele, `roteiro.md` com as duas versões. Um roteiro que só cita etapas foi recusado
    pelo dono: **cada etapa diz o que acontece e como**, com o artefato real em tela.
    - **Curto:** teto medido de 630 caracteres por idioma (12,2 caracteres/s); cada fala tem uma ação e um porquê.
-   - **Longo:** até 3400 caracteres, no máximo 15 etapas, cada uma com 2 a 4 frases, abrindo com o contexto e fechando com um caso real.
+   - **Longo:** até 3500 caracteres em 300 s (7000 em `longSeconds` 600), no máximo 20 etapas (30 em 600 s), cada uma com 2 a 4 frases, abrindo com o contexto e fechando com um caso real.
    - Fala curta, sem jargão desnecessário; `facts` lista todo número usado.
 3. **Conferência.** `node <skill>/scripts/make.mjs check <video.json>`. Erro de teto se resolve cortando texto, nunca acelerando voz.
 4. **Prévia, sem gastar API.** `node <skill>/scripts/make.mjs preview <video.json>`: gera linha do tempo estimada e quadros em

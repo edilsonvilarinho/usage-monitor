@@ -31,10 +31,10 @@ Um arquivo por vídeo, em `docs/planos/video-<slug>/video.json`. É a única ent
 Cada regra devolve uma mensagem que nomeia o beat e o campo. A validação junta todos os erros, não para no primeiro.
 
 1. `slug`: minúsculas, dígitos e hífen. `link`: URL `https://`.
-2. `beats`: de 3 a 20; `id` único, minúsculas e hífen. O último beat é o fechamento: sem `items`, sem `image`.
+2. `beats`: de 3 a 20 (30 com `longSeconds` 600); `id` único, minúsculas e hífen. O último beat é o fechamento: sem `items`, sem `image`.
 3. `kicker` e `title` têm `pt` e `en`. `title` até 34 caracteres.
 4. `long` obrigatório em todo beat, com `pt` e `en`. `short` opcional: beat sem `short` não entra no vídeo curto. Ao menos 3 beats têm `short`, e o último também.
-5. Teto de texto falado por idioma: curto até 650 caracteres, longo até 3500. Passou, a mensagem diz quantos cortar. Nunca se acelera a voz.
+5. Teto de texto falado por idioma: curto até 650 caracteres, longo até 3500 em `longSeconds` 300, e `3500 × longSeconds / 300` em 600 (7000). Passou, a mensagem diz quantos cortar. Nunca se acelera a voz.
 6. `items`: até 8; `pt` e `en` até 90 caracteres quando `mono`, 44 nos demais. `status`: `ok`, `crit` ou ausente.
 7. Com `image`, até 3 itens, e o arquivo existe e é `.png`, `.jpg` ou `.jpeg`. O caminho é relativo ao `video.json`; sem arquivo ali, à raiz do repositório.
 8. No máximo um beat com `climax: true`. Sem nenhum, o clímax é o penúltimo.
@@ -58,7 +58,7 @@ Vozes: `elevenlabs/eleven-v4`, `matilda` (PT), `george` (EN). Pasta de trabalho:
 
 ## Linha do tempo (`buildTimeline`)
 
-Entrada: lista `{ id, durationSec }` de falas, alvo e cauda. Primeira fala em 1,0 s. `gap` igual entre falas, o maior entre 0,8 e 3,0 s que caiba no alvo, deixando a cauda depois da última fala. Abaixo de 0,8 s lança erro com os segundos que sobram. Alvo e cauda: curto 60,0 e 0,6; longo 300,0 e 3,0.
+Entrada: lista `{ id, durationSec }` de falas, alvo e cauda. Primeira fala em 1,0 s. `gap` igual entre falas, o maior entre 0,8 e 3,0 s que caiba no alvo, deixando a cauda depois da última fala. Abaixo de 0,8 s lança erro com os segundos que sobram. Alvo e cauda: curto 60,0 e 0,6; longo `longSeconds` (300,0 ou 600,0) e 3,0. `longSeconds` é opcional na raiz do `video.json`; ausente vale 300; outro valor é erro do `check`.
 `duration` é o alvo, ou menos se o `gap` chegou a 3,0 s. Beat: `start = speechStart - 0.4` (o primeiro em 0), `end` é o início do próximo, o último termina em `duration`.
 `items[j].at`: distribuídos por igual entre `speechStart + 0.3` e `speechEnd - 0.6`. No curto, só itens com `short`; se nenhum tiver, entram todos, até 4.
 
