@@ -56,10 +56,33 @@ esconde o eixo fraco.
 | A02 | feito | vermelho: `node --test tools/ci/test/repo-benchmark.test.mjs` sobre stubs, exit 1, `Expected values to be strictly deep-equal` (actual `{ score: null, date: null, checks: [] }`, expected `{ score: 6.4, … }`) e `actual: 0, expected: 1`; verde: mesmo comando, `tests 12, pass 12, fail 0`; `node --test "tools/ci/test/*.test.mjs"`: `tests 543, pass 543, fail 0`. Percentil por piso; posição contra o grupo inteiro (7 repositórios); só o agregado do Scorecard entra no relatório |
 | A03 | feito | vermelho: `node --test tools/ci/test/repo-benchmark.test.mjs` com `renderHtml` stub, 23 testes, 11 falhas na asserção (`Expected values to be strictly equal`, `The expression evaluated to a falsy value`); devolução 1 (tabela vazava do painel a 1280px): vermelho `The input did not match the regular expression /<div class="scroll">\s*<table>/`; devolução 2 (página rolava na horizontal a 420px): o teste da coluna única foi escrito depois do CSS, **sem vermelho registrado**; verde: `node --test "tools/ci/test/*.test.mjs"`, `tests 556, pass 556, fail 0`. Conferido pelo orquestrador no Chrome headless: 1280px sem vazamento, iframe de 420px em coluna única, `scrollWidth` 405 |
 | A04 | feito | vermelho: `node --test tools/ci/test/repo-benchmark.test.mjs` só com `PR_LIMIT` exportado, `Expected values to be strictly equal: actual: undefined, expected: true` e `The expression evaluated to a falsy value` (HTML); verde: `node --test "tools/ci/test/*.test.mjs"`, `tests 560, pass 560, fail 0`. Nota de rodapé `≥` só aparece quando alguma linha bateu o teto |
+| A05 | feito | Scorecard CLI v5.6.0 (`gh release download v5.6.0 -R ossf/scorecard`, SHA-256 `f69b8b91…` conferido com `scorecard_checksums.txt`) em 5 repositórios, `GITHUB_AUTH_TOKEN` só no ambiente do processo; ktor e kotlinx.coroutines pela API (varredura de 2026-11-23). `node tools/ci/repo-benchmark.mjs --scorecard-dir <json> --out … --md … --html …`: exit 0 em 23,5 s; linha de base abaixo |
+
+### Linha de base (2026-11-27, janela de 90 dias)
+
+| Repositório | Grupo | Scorecard | Releases 90d | PRs mesclados 90d | Mediana merge (h) | Taxa de revert |
+|---|---|---|---:|---:|---:|---:|
+| edilsonvilarinho/usage-monitor | target | 4,8 | 76 | 252 | 0,1 | 0,4% |
+| steipete/CodexBar | same-goal | 4,3 | 45 | ≥1000 | 7,9 | 0,1% |
+| Nihondo/AgentLimits | same-goal | 3,6 | 3 | 0 | — | — |
+| methol-dev/usage-bar | same-goal | 3,0 | 2 | 2 | 0,1 | 0,0% |
+| ktorio/ktor | large-stack | 4,6 | 3 | 156 | 56,9 | 0,0% |
+| Kotlin/kotlinx.coroutines | large-stack | 5,0 | 0 | 46 | 164,1 | 0,0% |
+| JetBrains/compose-multiplatform | large-stack | 4,0 | 7 | 102 | 20,6 | 0,0% |
+
+Posição do alvo: Scorecard 2º de 7 (percentil 83); releases 1º de 7 (100); mediana de merge 1º de 6 (80); taxa de revert
+6º de 6 (0). Checks do Scorecard do alvo em 0: `Code-Review`, `SAST`, `Pinned-Dependencies`, `Signed-Releases`, `Fuzzing`,
+`CII-Best-Practices`; `Branch-Protection` 3, `Vulnerabilities` 4; inconclusivos: `Dangerous-Workflow`, `Packaging`,
+`Token-Permissions`.
+
+Leitura: mediana de 0,1 h e 76 releases vêm do auto-merge sem revisão humana e do canal beta; “menor é melhor” na mediana
+premia mesclar sem revisão, e o `Code-Review` 0 é o mesmo fato visto pelo Scorecard. Os números de entrega não medem
+qualidade; a taxa de defeito que escapou da #645 (15,5%) continua sendo a medida de qualidade.
 
 ## Problemas em aberto e riscos
 
 - Scorecard da API cobre só repositórios varridos pela OpenSSF; os pares pequenos e o próprio alvo dependem do CLI.
+  Versões diferentes (API × CLI v5.6.0) podem pontuar diferente; a linha de base mistura as duas origens.
 - Taxa de revert subestima defeito (a #645 mediu 1 revert em 105 merges contra 15,5% de defeito que escapou); fica
   como proxy comparável entre repositórios, não como taxa de falha.
 - Repositórios grandes mesclam PR por bot ou fora do GitHub (ex.: Gerrit/Space); mediana de merge pode não refletir
