@@ -32,6 +32,7 @@ limite de turnos, esperando trabalho próprio) passa sem a orquestradora conferi
 |---|---|
 | A01 | Este plano |
 | A02 | Regra de primeiro plano nos agentes e nos modelos |
+| A03 | sem harness (texto de skill); `grep -n "## Agent hygiene" .claude/skills/usage-monitor-workflow/SKILL.md` | seção presente antes de "Prototype gate"; aplicada nesta sessão: `TaskStop a4269cb97aa9038a9` encerrou o `backend-dev` da #690 |
 | A03 | Seção "Agent hygiene" na skill `usage-monitor-workflow` |
 
 ## Ponto de situação

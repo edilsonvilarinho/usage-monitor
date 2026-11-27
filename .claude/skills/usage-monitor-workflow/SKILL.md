@@ -128,6 +128,21 @@ node .claude/skills/orchestrate/portal/emit.mjs escalada --sessao ${CLAUDE_SESSI
 `emit.mjs escalada` refuses a task below the limit. Limits live in `LIMITE_REPROVACOES` in
 `.claude/skills/orchestrate/portal/emit.mjs` (haiku 3, sonnet 3).
 
+## Agent hygiene (#697)
+
+Never wait passively for an agent. Every notification about an agent (`finished`, `PARTIAL`, turn limit, "waiting on its
+own background work") is handled in the same turn:
+
+1. Inspect the worktree yourself: `git status --short`, `git diff --stat`, the modification time of the agent's logs and
+   of `build/test-results/**`, and any file it said it would restore. A claimed red or green is read from the XML/log,
+   never from the report.
+2. Run `ListAgents`. An agent whose task is approved, or that stopped with a shell still running, is ended with
+   `TaskStop <id>`; a returned agent with a live shell is stopped before the `SendMessage`, so the resume starts clean.
+3. A turn-limit stop is not a rejection: send the remaining items, at most 3 per message, so the next run fits the turns.
+
+Before step 8 and before ending any turn that waits on the user, `ListAgents` shows no agent of this task running or
+waiting on a shell, nor one left from an earlier task (measured: `backend-dev` of #690 alive after the merge).
+
 ## Prototype gate (visual work)
 
 1. Generate the prototypes in `prototipos/<entrega>/`, one agent per prototype, with genuinely different directions.
