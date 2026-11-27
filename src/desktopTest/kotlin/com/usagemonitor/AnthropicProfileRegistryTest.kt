@@ -247,6 +247,58 @@ class AnthropicProfileRegistryTest {
         assertEquals(setOf(duplicate.id), resolution.duplicateProfileIds)
     }
 
+    /** `~/.claude_<nome>` (grafia de alias de `CLAUDE_CONFIG_DIR`) é descoberto como `~/.claude-<nome>`. */
+    @Test
+    fun `discovers claude underscore suffix directory with files as discovered profile`() {
+        val defaultDir = File(tempDir, ".claude").also { it.mkdirs() }
+        val workDir = File(tempDir, ".claude_work").also { it.mkdirs() }
+        writeProfileFiles(defaultDir, File(tempDir, ".claude.json"), "default@example.com", "account-a")
+        writeProfileFiles(workDir, File(workDir, ".claude.json"), "work@example.com", "account-b")
+
+        val registry = newRegistry()
+
+        val work = registry.profiles.value.firstOrNull { it.configDirectory == workDir.canonicalPath }
+        assertNotNull(work)
+        assertEquals(AnthropicProfileOrigin.DISCOVERED, work.origin)
+        assertEquals("work", work.label)
+    }
+
+    /** Diretório `~/.claude_<nome>` sem arquivo de identidade não vira perfil, igual ao hífen. */
+    @Test
+    fun `ignores claude underscore suffix directory without anthropic files`() {
+        val defaultDir = File(tempDir, ".claude").also { it.mkdirs() }
+        File(tempDir, ".claude_empty").mkdirs()
+        writeProfileFiles(defaultDir, File(tempDir, ".claude.json"), "default@example.com", "account-a")
+
+        val registry = newRegistry()
+
+        assertEquals(listOf("default"), registry.profiles.value.map { it.id })
+    }
+
+    /**
+     * `.claude-x` e `.claude_x` coexistem com ids distintos (o id é o caminho). O rótulo do
+     * hífen fica `x`; o do sublinhado, que perderia o nome, vira `claude_x`.
+     */
+    @Test
+    fun `claude hyphen and underscore suffixes with the same name get distinct labels`() {
+        val defaultDir = File(tempDir, ".claude").also { it.mkdirs() }
+        val hyphenDir = File(tempDir, ".claude-x").also { it.mkdirs() }
+        val underscoreDir = File(tempDir, ".claude_x").also { it.mkdirs() }
+        writeProfileFiles(defaultDir, File(tempDir, ".claude.json"), "default@example.com", "account-a")
+        writeProfileFiles(hyphenDir, File(hyphenDir, ".claude.json"), "x@example.com", "account-b")
+        writeProfileFiles(underscoreDir, File(underscoreDir, ".claude.json"), "x2@example.com", "account-c")
+
+        val registry = newRegistry()
+
+        val hyphen = registry.profiles.value.firstOrNull { it.configDirectory == hyphenDir.canonicalPath }
+        val underscore = registry.profiles.value.firstOrNull { it.configDirectory == underscoreDir.canonicalPath }
+        assertNotNull(hyphen)
+        assertNotNull(underscore)
+        assertTrue(hyphen.id != underscore.id)
+        assertEquals("x", hyphen.label)
+        assertEquals("claude_x", underscore.label)
+    }
+
     private fun writeProfileFiles(
         configDirectory: File,
         identityFile: File,

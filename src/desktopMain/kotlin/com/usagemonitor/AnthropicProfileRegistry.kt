@@ -311,10 +311,14 @@ internal class AnthropicProfileRegistry(
 
         home.listFiles()
             ?.asSequence()
-            ?.filter { file -> file.isDirectory && file.name.startsWith(".claude-") }
+            ?.filter { file -> file.isDirectory && isProfileSuffixName(file.name) }
             ?.sortedBy { file -> file.name.lowercase() }
             ?.forEach { directory ->
-                add(directory, AnthropicProfileOrigin.DISCOVERED, directory.name.removePrefix(".claude-"))
+                // Só perfis já aceitos entram em `takenLabels`: diretório sem arquivos não tira o nome de ninguém.
+                val takenLabels = candidates.values
+                    .filter { candidate -> candidate.origin == AnthropicProfileOrigin.DISCOVERED }
+                    .mapTo(mutableSetOf()) { candidate -> candidate.label }
+                add(directory, AnthropicProfileOrigin.DISCOVERED, discoveredLabel(directory.name, takenLabels))
             }
 
         return candidates.values.toList()
@@ -398,6 +402,8 @@ internal class AnthropicProfileRegistry(
         private const val KEY_HIDDEN = "hidden"
         private const val KEY_COLOR = "color"
         private const val KEY_EMOJI = "emoji"
+        private const val CLAUDE_HYPHEN_PREFIX = ".claude-"
+        private const val CLAUDE_UNDERSCORE_PREFIX = ".claude_"
         private val LABEL_AUTOSAVE_DEBOUNCE = 300.milliseconds
 
         /**
@@ -411,6 +417,20 @@ internal class AnthropicProfileRegistry(
         /** A forma de comparar diretórios de configuração: absoluta, normalizada e sem caixa. */
         internal fun normalizedPath(path: String): String =
             File(path).absoluteFile.normalize().path.trimEnd(File.separatorChar).lowercase()
+
+        /** Os dois prefixos de diretório de perfil em `~`: `.claude-<nome>` e `.claude_<nome>`. */
+        private fun isProfileSuffixName(name: String): Boolean =
+            name.startsWith(CLAUDE_HYPHEN_PREFIX) || name.startsWith(CLAUDE_UNDERSCORE_PREFIX)
+
+        /**
+         * Rótulo do perfil descoberto. Hífen ordena antes de sublinhado, então `.claude-x` já
+         * chega com `x`; `.claude_x` só cai para o nome completo (`claude_x`) se `x` já estiver tomado.
+         */
+        private fun discoveredLabel(directoryName: String, takenLabels: Set<String>): String {
+            if (directoryName.startsWith(CLAUDE_HYPHEN_PREFIX)) return directoryName.removePrefix(CLAUDE_HYPHEN_PREFIX)
+            val suffix = directoryName.removePrefix(CLAUDE_UNDERSCORE_PREFIX)
+            return if (suffix in takenLabels) directoryName.removePrefix(".") else suffix
+        }
 
         private fun readStoredFrom(profilesNode: Preferences): List<AnthropicProfileRecord> {
             val children = runCatching { profilesNode.childrenNames().toList() }.getOrDefault(emptyList())

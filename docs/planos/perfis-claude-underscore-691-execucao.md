@@ -35,7 +35,10 @@ descoberto como `DISCOVERED`, igual a `~/.claude-<nome>`.
 
 | Id | Comando | Resultado |
 |---|---|---|
-| A01 | `git log -1` | plano commitado |
+| A01 | `git log -1` | plano commitado (`0628d9e9`) |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.AnthropicProfileRegistryTest" --tests "*ArchitectureRulesTest*"` | 90 testes, 2 falhas: `AnthropicProfileRegistryTest.kt:261` `assertNotNull(work)` e `:296` `assertNotNull(underscore)` → `AssertionError` |
+| A02 | verde: mesmo comando + `koverXmlReport -Pcoverage` (`test-runner`) | exit 0; `AnthropicProfileRegistryTest` 13/13, `ArchitectureRulesTest` 41/41, `Cancellation…` 13/13, `Prose…` 23/23. Teste de diretório `.claude_` vazio passa antes e depois: guarda de regressão, não vermelho |
+| A02 | `node tools/ci/diff-coverage.mjs --base origin/main --kover build/reports/kover/report.xml` | 9/9 linhas cobertas (100%) |
 
 ## Problemas em aberto e riscos
 

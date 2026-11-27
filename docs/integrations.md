@@ -42,7 +42,7 @@ Environment variables are never read for API keys.
 ## Anthropic
 
 - Discovers the default `~/.claude` profile, the `CLAUDE_CONFIG_DIR` inherited at startup, and any
-  `~/.claude-*` directory that holds an Anthropic configuration. Extra profiles can also be
+  `~/.claude-*` or `~/.claude_*` directory that holds an Anthropic configuration. Extra profiles can also be
   registered by hand in **Settings > Anthropic accounts**.
 - Newly detected profiles stay **disabled until you confirm them**. Enabled profiles all show at
   once, one card per account or workspace. Duplicate paths and duplicate identities do not produce
