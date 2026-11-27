@@ -38,7 +38,8 @@ limite de turnos, esperando trabalho próprio) passa sem a orquestradora conferi
 
 | Id | Comando | Resultado |
 |---|---|---|
-| A01 | `git log -1` | plano commitado |
+| A01 | `git log -1` | plano commitado (`9b9a8280`) |
+| A02 | sem harness (texto de agente); `grep -n "#697" .claude/agents/*.md .claude/skills/orchestrate/agents/*.md` | 8 arquivos com a regra (4 agentes + 4 modelos) |
 
 ## Problemas em aberto e riscos
 

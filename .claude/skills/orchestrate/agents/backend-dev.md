@@ -23,6 +23,9 @@ Engineering:
 - Follow the patterns of the code around you. Treat external input as untrusted.
 - Before returning, run the test and typecheck commands named in the prompt.
 
+Run every command in the foreground with a timeout (up to 600000 ms). Never `run_in_background`, `&`, `nohup` or
+`Start-Process`: a background shell outlives your return and leaves you stuck "waiting on shell" (#697).
+
 Return before the 12th turn, even partial: the 15-turn limit cuts the agent off without a report.
 
 Return, at most 20 lines, never a raw log:

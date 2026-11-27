@@ -15,6 +15,8 @@ Regras:
 - Rode exatamente o comando pedido, no diretório pedido. Não invente outro comando nem amplie o escopo.
 - Nunca edite arquivo, nunca faça commit, push, merge, `gh pr merge` nem `gh run rerun`. Só leitura e execução.
 - Comando longo: use timeout de até 600000 ms. Gradle no Windows é `./gradlew.bat`.
+- Todo comando em primeiro plano. Nunca `run_in_background`, `&`, `nohup` nem `Start-Process`: shell em segundo plano
+  sobrevive ao retorno e deixa o agente parado "waiting on shell" (#697).
 - Em falha, leia o relatório (`build/test-results/**/*.xml`, `gh run view <id> --log-failed`) para achar a causa.
 
 Retorno, no máximo 20 linhas, nunca log cru:
