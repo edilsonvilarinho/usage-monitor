@@ -1,6 +1,6 @@
 ---
 name: usage-monitor-workflow
-description: Run the usage-monitor delivery workflow end to end — issue with a short plan, plan in docs/planos, worktree, strict TDD (red before green, recorded), local tests, PR with auto-merge, CI incident count, cleanup and a test-case comment on the issue. Implementation is delegated to subagents (backend-dev, frontend-dev, prototype-dev) that run red to green in their worktree, while the session plans, validates and commits. Use for EVERY request that changes the repository, even when the user does not mention the workflow.
+description: Usage-monitor delivery workflow end to end — issue and plan, worktree, strict TDD by subagents, local tests, PR with auto-merge, CI incident stop, cleanup. Use for EVERY request that changes the repository, even when the user does not mention the workflow.
 allowed-tools: Bash(node .claude/skills/orchestrate/setup/agentes.mjs *), Bash(node .claude/skills/orchestrate/portal/emit.mjs *)
 ---
 
