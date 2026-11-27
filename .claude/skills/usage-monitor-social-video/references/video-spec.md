@@ -66,6 +66,10 @@ A legenda usa sempre o texto escrito.
 
 Vozes: `elevenlabs/eleven-v4`, `matilda` (PT), `george` (EN). Pasta de trabalho: `build/social-video/<slug>/`. Saída: `~/Videos/usage-monitor/<slug>/`.
 
+## Prévia jogável (`qa/player-<variante>.html`)
+
+`make.mjs preview` também grava `qa/player-<variante>.html` para cada variante preparada: a cena em tempo real (iframe de `assets/index.html`, `renderAt(t)`), tocar/pausar, barra de tempo arrastável, anterior/próximo por beat e a lista de beats (título, texto falado inteiro, início). Clicar num beat pula para ele. Não há áudio; o tempo é o estimado. Como `file://` bloqueia o `renderAt` do iframe, sirva o repositório com `make.mjs serve <video.json> [--port 8765]` (só GET, dentro da raiz) e abra a URL impressa. Lógica em `scripts/player.mjs`; teste em `scripts/test/player.test.mjs`.
+
 ## Linha do tempo (`buildTimeline`)
 
 Entrada: lista `{ id, durationSec }` de falas, alvo e cauda. Primeira fala em 1,0 s. `gap` igual entre falas, o maior entre 0,8 e 3,0 s que caiba no alvo, deixando a cauda depois da última fala. Abaixo de 0,8 s lança erro com os segundos que sobram. Alvo e cauda: curto 60,0 e 0,6; longo `longSeconds` (300,0 ou 600,0) e 3,0. `longSeconds` é opcional na raiz do `video.json`; ausente vale 300; outro valor é erro do `check`.

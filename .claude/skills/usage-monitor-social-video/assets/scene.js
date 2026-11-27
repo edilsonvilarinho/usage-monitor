@@ -145,8 +145,8 @@ WF.register({
     const pickPose = (table, idx, n) => (idx === 0
       ? table[0]
       : idx === n - 1 ? table[table.length - 1] : table[1 + ((idx - 1) % (table.length - 2))])
-    // Beat com imagem em 16:9: câmera recua (z 0,72) e o centro vai ao lado oposto ao título; o horizonte sai parcialmente do quadro.
-    const POSE_IMG = { z: 0.72, cx: W - 80, cy: 540, k: 0.28, rot: -0.05 }
+    // Beat com imagem em 16:9: câmera recua (z 0,60) e o horizonte vai à borda direita (cx W-40), abrindo espaço ao painel à esquerda.
+    const POSE_IMG = { z: 0.6, cx: W - 40, cy: 540, k: 0.28, rot: -0.05 }
     const hasImg = (i) => !!(images[i] && images[i].naturalWidth)
     const POSE_OF = beats.map((_, i) => (vertical ? POSE9_V : hasImg(i) ? POSE_IMG : pickPose(POSE16, i, beats.length)))
     const poseOf = (idx) => POSE_OF[idx]
@@ -215,7 +215,7 @@ WF.register({
     })
 
     // Imagem opcional do beat (beat.image, carregada pela página): painel com moldura, raio 8, 1 px #3D3838.
-    // 16:9: imagem herói com 58% de W, no lado do título, abaixo dele; a altura é limitada pela faixa e a imagem é cortada (cover).
+    // 16:9: imagem herói com até 70% de W, no lado do título, abaixo dele; a imagem cabe inteira (contain); sem altura, o painel estreita.
     // 9:16: na faixa da coluna, com os itens abaixo.
     const IMGS = beats.map((_, i) => images[i] || null)
     const FRAME = beats.map((_, idx) => {
@@ -235,8 +235,9 @@ WF.register({
       const avail = left ? pose.cx - Rd - 12 - MARG : W - MARG - (pose.cx + Rd + 12)
       const top = tb.y + tb.h + 24
       const maxH = BAND - 20 - top
-      const w = Math.max(0, Math.min(0.58 * W, avail))
-      const h = Math.max(0, Math.min(w / aw, maxH))
+      // Inteira (contain): sem altura para a largura cheia, o painel estreita; captura de tela não perde borda.
+      const w = Math.max(0, Math.min(0.70 * W, avail, maxH * aw))
+      const h = Math.max(0, w / aw)
       return { x: left ? MARG : W - MARG - w, y: top, w, h }
     })
     // Obstáculos de cada beat: a caixa do título e, se houver, a moldura da imagem.
@@ -391,8 +392,14 @@ WF.register({
         b.y -= s * (oy + 8) * (1 - ka)
       }
     }
+    // Obstáculos por último em cada volta: título e moldura ganham da posição. Depois, vagas livres (acima, abaixo ou
+    // ao lado de cada obstáculo); se nenhuma couber, o rótulo não é desenhado (o corpo continua visível).
+    const overlaps = (p, q) => Math.min(p.x + p.w, q.x + q.w) - Math.max(p.x, q.x) > 0 && Math.min(p.y + p.h, q.y + q.h) - Math.max(p.y, q.y) > 0
     const solve = (boxes, cam, obst) => {
       const Rd = RS * cam.z * 1.08 + 12
+      const inHorizon = (bx) => Math.hypot(clamp(cam.cx, bx.x, bx.x + bx.w) - cam.cx, clamp(cam.cy, bx.y, bx.y + bx.h) - cam.cy) < Rd
+      const blocked = (c, self) => inHorizon(c) || obst.some((o) => overlaps(c, o)) || boxes.some((o) => o !== self && overlaps(c, o))
+      const inBounds = (c) => { c.x = clamp(c.x, MARG, W - MARG - c.w); c.y = clamp(c.y, TOP, BAND - c.h) }
       for (let it = 0; it < 40; it++) {
         for (const bx of boxes) {
           const nx = clamp(cam.cx, bx.x, bx.x + bx.w)
@@ -406,15 +413,22 @@ WF.register({
             bx.x += (dx / d) * push
             bx.y += (dy / d) * push
           }
-          for (const o of obst) separate(bx, o, 1)
         }
         for (let i = 0; i < boxes.length; i++) {
           for (let j = i + 1; j < boxes.length; j++) separate(boxes[i], boxes[j], 0.5)
         }
-        for (const bx of boxes) {
-          bx.x = clamp(bx.x, MARG, W - MARG - bx.w)
-          bx.y = clamp(bx.y, TOP, BAND - bx.h)
+        for (const bx of boxes) inBounds(bx)
+        for (const bx of boxes) for (const o of obst) separate(bx, o, 1)
+        for (const bx of boxes) inBounds(bx)
+      }
+      for (const bx of boxes) {
+        if (!blocked(bx, bx)) continue
+        const cands = []
+        for (const o of obst) {
+          cands.push({ x: bx.x, y: o.y - bx.h - 8 }, { x: bx.x, y: o.y + o.h + 8 }, { x: o.x - bx.w - 8, y: bx.y }, { x: o.x + o.w + 8, y: bx.y })
         }
+        const free = cands.map((c) => ({ x: c.x, y: c.y, w: bx.w, h: bx.h })).map((c) => { inBounds(c); return c }).find((c) => !blocked(c, bx))
+        if (free) { bx.x = free.x; bx.y = free.y } else bx.hidden = true
       }
     }
 
@@ -505,7 +519,7 @@ WF.register({
       if (!items.length) return
       solve(items.map((i) => i.box), cam, OBST[idx])
       clipOutside(cam.cx, cam.cy, RS * cam.z * 1.01, () => {
-        for (const it of items) drawLabel(it)
+        for (const it of items) if (!it.box.hidden) drawLabel(it)
       })
     }
 

@@ -33,7 +33,7 @@ imagens). Mídia fica fora: `build/social-video/<slug>/` e `~/Videos/usage-monit
 3. **Conferência.** `node <skill>/scripts/make.mjs check <video.json>`. Erro de teto se resolve cortando texto, nunca acelerando voz. Beat com `code` mostra um trecho de arquivo do repo (contrato em `references/video-spec.md`, Código).
 4. **Prévia, sem gastar API.** `node <skill>/scripts/make.mjs preview <video.json>`: gera linha do tempo estimada e quadros em
    `build/social-video/<slug>/qa/`, com folha de contato `sheet.jpg`. **Olhe a folha você mesmo**: texto cortado, sobreposição, imagem
-   ilegível ou faixa de legenda invadida voltam para o `video.json`.
+   ilegível ou faixa de legenda invadida voltam para o `video.json`. A prévia também grava `qa/player-<variante>.html`, uma cena jogável com lista de beats; abra-a por `make.mjs serve <video.json>` (URL impressa), porque `file://` bloqueia o iframe.
 5. **Parada obrigatória.** Mande `roteiro.md` e a folha ao dono e espere o ok. Nada de voz nem render antes: render longo custa
    cerca de 14 minutos por idioma, e o dono já recusou roteiro depois do visual aprovado.
 6. **Chave.** Peça a chave só agora, se não veio. Grave em arquivo temporário fora do repositório e passe por variável de ambiente.
