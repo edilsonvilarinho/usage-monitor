@@ -1,0 +1,7 @@
+{
+  "target": "edilsonvilarinho/usage-monitor",
+  "groups": {
+    "same-goal": ["steipete/CodexBar", "Nihondo/AgentLimits", "methol-dev/usage-bar"],
+    "large-stack": ["ktorio/ktor", "Kotlin/kotlinx.coroutines", "JetBrains/compose-multiplatform"]
+  }
+}

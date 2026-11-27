@@ -44,13 +44,15 @@ esconde o eixo fraco.
 |---|---|---|
 | A01 | Este plano | `docs/planos/` |
 | A02 | Script com parte pura testada e casca `gh`/API | `tools/ci/repo-benchmark.mjs`, `tools/ci/repo-benchmark-peers.json`, `tools/ci/test/repo-benchmark.test.mjs` |
-| A03 | Rodar contra o grupo e registrar a linha de base | `docs/planos/` |
+| A03 | Saída HTML no design system (`--html`), pedido do dono em 2026-11-27 | `tools/ci/repo-benchmark.mjs`, teste |
+| A04 | Rodar contra o grupo e registrar a linha de base | `docs/planos/` |
 
 ## Ponto de situação
 
 | ID | Estado | Comando e resultado |
 |---|---|---|
 | A01 | feito | plano escrito; fatos medidos com os comandos citados acima |
+| A02 | feito | vermelho: `node --test tools/ci/test/repo-benchmark.test.mjs` sobre stubs, exit 1, `Expected values to be strictly deep-equal` (actual `{ score: null, date: null, checks: [] }`, expected `{ score: 6.4, … }`) e `actual: 0, expected: 1`; verde: mesmo comando, `tests 12, pass 12, fail 0`; `node --test "tools/ci/test/*.test.mjs"`: `tests 543, pass 543, fail 0`. Percentil por piso; posição contra o grupo inteiro (7 repositórios); só o agregado do Scorecard entra no relatório |
 
 ## Problemas em aberto e riscos
 
