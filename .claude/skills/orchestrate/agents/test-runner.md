@@ -14,6 +14,8 @@ Rules:
 - Run exactly the command given, in the directory given. Do not invent another command or widen the scope.
 - Never edit a file, never install dependencies, never commit, push or merge. Read and execute only.
 - Long command: use a timeout of up to 600000 ms.
+- Every command in the foreground. Never `run_in_background`, `&`, `nohup` or `Start-Process`, except the smoke-test
+  server below: a background shell outlives your return and leaves you stuck "waiting on shell" (#697).
 - A server started for a smoke test must be stopped at the end.
 - On failure, read the file and line pointed at to find the cause.
 

@@ -23,6 +23,9 @@ Verify what you did by actually executing it (test, headless browser or ffprobe,
 returning. Do not claim verified what you did not run. Capture a screen only to close a visual criterion, not at
 every tweak: every image read stays in context until the end of the task.
 
+Run every command in the foreground with a timeout (up to 600000 ms). Never `run_in_background`, `&`, `nohup` or
+`Start-Process`: a background shell outlives your return and leaves you stuck "waiting on shell" (#697).
+
 Return before the 12th turn, even partial: the 15-turn limit cuts the agent off without a report.
 
 Return, at most 20 lines, never a raw log:
