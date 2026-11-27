@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.MICROS_PER_USD
 import com.usagemonitor.domain.entity.ModelPricingTable
+import com.usagemonitor.domain.entity.SYNTHETIC_MODEL_ID
 import com.usagemonitor.domain.entity.activeTimeMillisOf
 import com.usagemonitor.domain.entity.computeContextStatus
 import com.usagemonitor.domain.entity.toModelBreakdown
@@ -29,7 +30,8 @@ class ComputeCliSessionAnalyticsUseCase {
 
         val mainTurns = turns.filter { turn -> !turn.isSidechain }
         val breakdown = computeBreakdown(turns)
-        val lastMainTurn = mainTurns.lastOrNull()
+        // Aviso `<synthetic>` conta como turno, mas não define contexto vivo nem modelo.
+        val lastMainTurn = mainTurns.lastOrNull { turn -> turn.model != SYNTHETIC_MODEL_ID }
         // Mesmo cálculo que a lista faz a partir do índice: um único caminho para
         // que os dois nunca divirjam.
         val contextStatus = computeContextStatus(

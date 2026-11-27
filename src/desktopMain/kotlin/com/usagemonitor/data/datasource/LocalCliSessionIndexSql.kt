@@ -1,6 +1,7 @@
 package com.usagemonitor.data.datasource
 
 import com.usagemonitor.domain.entity.LONG_PROMPT_THRESHOLD_TOKENS
+import com.usagemonitor.domain.entity.SYNTHETIC_MODEL_ID
 
 // SQL e constantes do índice de sessões do Claude CLI. Moravam no companion de
 // `LocalCliSessionDataSource` e saíram pelo limite de 800 linhas (#303); só a
@@ -543,7 +544,7 @@ internal val SELECT_LIVE_CONTEXTS_SQL = """
     JOIN (
       SELECT session_id, MAX(seq) AS max_seq
       FROM cli_turns
-      WHERE is_sidechain = 0
+      WHERE is_sidechain = 0 AND (model IS NULL OR model <> '$SYNTHETIC_MODEL_ID')
       GROUP BY session_id
     ) m ON m.session_id = t.session_id AND t.seq = m.max_seq;
 """
@@ -556,7 +557,7 @@ internal val SELECT_LIVE_CONTEXT_BY_SESSION_SQL = """
     JOIN (
       SELECT session_id, MAX(seq) AS max_seq
       FROM cli_turns
-      WHERE is_sidechain = 0 AND session_id = ?
+      WHERE is_sidechain = 0 AND (model IS NULL OR model <> '$SYNTHETIC_MODEL_ID') AND session_id = ?
       GROUP BY session_id
     ) m ON m.session_id = t.session_id AND t.seq = m.max_seq
     WHERE t.session_id = ?;

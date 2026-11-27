@@ -4,6 +4,7 @@ import com.usagemonitor.data.datasource.LocalCliSessionDataSource
 import com.usagemonitor.domain.entity.CliProjectRoot
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionTailOutcome
+import com.usagemonitor.domain.entity.SYNTHETIC_MODEL_ID
 import com.usagemonitor.domain.entity.activeTimeMillisOf
 import kotlinx.coroutines.test.runTest
 import kotlin.time.Instant
@@ -511,6 +512,30 @@ class LocalCliSessionDataSourceTest {
             assertEquals(90_000L, session.liveContextTokens)
             assertEquals("claude-opus-5", session.liveContextModel)
             assertEquals(90_000L, assertNotNull(dataSource.readSession("session-a")).summary.liveContextTokens)
+        }
+    }
+
+    /**
+     * Aviso local do CLI (limite, erro 429, saldo) vira `assistant` com modelo `<synthetic>` e uso zero.
+     * Não é turno de modelo: o contexto vivo e o modelo continuam os do último turno real.
+     */
+    @Test
+    fun `synthetic assistant turn does not define live context`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", cacheReadTokens = 50_000L),
+                assistantLine("session-a", "msg-2", "2026-08-01T10:01:00Z", model = SYNTHETIC_MODEL_ID)
+            )
+            dataSource.syncIndex()
+
+            val session = dataSource.readSessions().single()
+            assertEquals(50_000L, session.liveContextTokens)
+            assertEquals("claude-opus-5", session.liveContextModel)
+            val detail = assertNotNull(dataSource.readSession("session-a"))
+            assertEquals(50_000L, detail.summary.liveContextTokens)
+            assertEquals("claude-opus-5", detail.summary.liveContextModel)
         }
     }
 
