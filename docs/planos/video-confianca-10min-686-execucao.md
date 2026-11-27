@@ -47,6 +47,7 @@ Ele pediu um protótipo HTML antes do vídeo e da voz, e quer manter a voz.
 |---|---|---|
 | A01 | `gh issue create`, `git worktree add` | issue #686; worktree com base em `5aa401b6` |
 | A03a | `node --test ".claude/skills/usage-monitor-social-video/scripts/test/*.test.mjs"`; `make.mjs check` no `video.json` da #684 | `longSeconds` (300 padrão, ou 600) muda o alvo do longo, o teto falado (`3500 × longSeconds / 300`) e o máximo de beats (20 ou 30). Vermelho: `gap ficaria abaixo de 0,8 s; sobram 294,400 s de fala para caber em 300 s` (o alvo de 600 s ainda não era lido). Verde 56/56. O `check` do vídeo da #684, sem o campo, continua em 300 s e passa |
+| A03b | `node --test ".claude/skills/usage-monitor-social-video/scripts/test/*.test.mjs"`; `make.mjs check` e `make.mjs stage` no `video.json` da #686 | Beat com `code` (`file`, `from`, `to`): o trecho real vira PNG (Plex Mono, linhas numeradas, `file:from-to` no topo, fonte de 26 a 18 px para caber; teto de 16 linhas e 110 colunas). Vermelho: `esperado: beat "fluxo" code: não pode vir junto com image`. Verde 72/72. O `check` recusou o trecho 41-48 do `HudGeometryPropertyTest.kt` (127 colunas), trocado por 125-133. 9 cartões gerados; conferi `regra-prosa` e `propriedade` na imagem: legíveis, sem corte |
 
 ## Problemas em aberto e riscos
 

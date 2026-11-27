@@ -31,7 +31,7 @@ Um arquivo por vídeo, em `docs/planos/video-<slug>/video.json`. É a única ent
 Cada regra devolve uma mensagem que nomeia o beat e o campo. A validação junta todos os erros, não para no primeiro.
 
 1. `slug`: minúsculas, dígitos e hífen. `link`: URL `https://`.
-2. `beats`: de 3 a 20 (30 com `longSeconds` 600); `id` único, minúsculas e hífen. O último beat é o fechamento: sem `items`, sem `image`.
+2. `beats`: de 3 a 20 (30 com `longSeconds` 600); `id` único, minúsculas e hífen. O último beat é o fechamento: sem `items`, sem `image`, sem `code`.
 3. `kicker` e `title` têm `pt` e `en`. `title` até 34 caracteres.
 4. `long` obrigatório em todo beat, com `pt` e `en`. `short` opcional: beat sem `short` não entra no vídeo curto. Ao menos 3 beats têm `short`, e o último também.
 5. Teto de texto falado por idioma: curto até 650 caracteres, longo até 3500 em `longSeconds` 300, e `3500 × longSeconds / 300` em 600 (7000). Passou, a mensagem diz quantos cortar. Nunca se acelera a voz.
@@ -40,6 +40,16 @@ Cada regra devolve uma mensagem que nomeia o beat e o campo. A validação junta
 8. No máximo um beat com `climax: true`. Sem nenhum, o clímax é o penúltimo.
 9. **Sem número inventado:** todo número com 2 ou mais dígitos em `title`, `items`, `short` e `long` precisa aparecer em algum texto de `facts`.
 10. Nenhum texto contém `sk-or-`.
+
+## Código (`code`)
+
+Beat opcional `code: { file, from, to, caption? }`, no lugar de `image` (os dois juntos são erro) e proibido no fechamento.
+
+- `file`: caminho relativo à raiz do repositório; tem que existir.
+- `from` e `to`: inteiros com `1 ≤ from ≤ to ≤` total de linhas do arquivo.
+- No máximo 16 linhas no trecho; a linha mais longa tem até 110 colunas (tab conta 4).
+- `caption`: `{ pt, en }` opcional; sem `items`, vira o primeiro item do beat.
+- Staging renderiza o trecho num PNG de 1500 px: fonte 26 px, descendo até 18 px se a linha mais longa não couber; indentação comum ao trecho é removida. O PNG entra no lugar de `image`.
 
 ## Forma falada (`toSpoken`)
 

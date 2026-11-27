@@ -1,6 +1,8 @@
 // Contrato video.json (references/video-spec.md): validacao, forma falada e variantes.
 // Puro: nenhum I/O. Quem le arquivos injeta fileExists.
 
+import { CODE_CARD, codeColumns, codeExcerpt } from './code-card.mjs'
+
 const LANGS = ['pt', 'en']
 const BEATS_MIN = 3
 const SHORT_MIN = 3
@@ -106,7 +108,8 @@ export const VARIANTS = Object.freeze([
 ])
 
 // Devolve a lista de erros; cada um nomeia o beat e o campo. Nao para no primeiro.
-export function validateSpec(spec, { fileExists } = {}) {
+// readText(caminho relativo à raiz do repo) devolve o texto do arquivo, ou null se não existe (regra do code).
+export function validateSpec(spec, { fileExists, readText = () => null } = {}) {
     if (typeof fileExists !== 'function') throw new TypeError('validateSpec precisa de { fileExists }')
     const errors = []
     const err = (message) => errors.push(message)
@@ -150,6 +153,50 @@ export function validateSpec(spec, { fileExists } = {}) {
 
     // Regra 10 (facts)
     facts.forEach((fact, index) => secret(fact, `facts[${index}]`))
+
+    // Regra 11: trecho de código (file, from, to, caption opcional). Só roda para beat que não é o fechamento.
+    const codeRules = (code, where) => {
+        const path = `${where} code`
+        if (code === null || typeof code !== 'object' || Array.isArray(code)) {
+            err(`${path}: precisa ser um objeto { file, from, to }`)
+            return
+        }
+        if (!filled(code.file)) {
+            err(`${where} code.file: ausente`)
+            return
+        }
+        const text = readText(code.file)
+        if (!isStr(text)) err(`${where} code.file: arquivo não existe (${code.file})`)
+        else {
+            const total = text.replace(/\r?\n$/, '').split(/\r?\n/).length
+            const { from, to } = code
+            if (!(Number.isInteger(from) && Number.isInteger(to) && from >= 1 && from <= to && to <= total)) {
+                err(`${path}: from e to precisam ser inteiros, com 1 ≤ from ≤ to ≤ ${total}`)
+            } else {
+                const count = to - from + 1
+                if (count > CODE_CARD.maxLines) err(`${path}: ${count} linhas; o máximo é ${CODE_CARD.maxLines}`)
+                const widest = Math.max(...codeExcerpt(text, from, to).map(codeColumns))
+                if (widest > CODE_CARD.maxColumns) {
+                    err(`${path}: linha mais longa com ${widest} colunas; o máximo é ${CODE_CARD.maxColumns}`)
+                }
+            }
+        }
+        if (code.caption != null) {
+            if (typeof code.caption !== 'object') err(`${path}.caption: precisa ser { pt, en }`)
+            else {
+                for (const lang of LANGS) {
+                    const caption = code.caption[lang]
+                    const at = `${path}.caption.${lang}`
+                    if (!filled(caption)) err(`${at}: ausente`)
+                    else {
+                        if (len(caption) > ITEM_MAX.plain) err(`${at}: ${len(caption)} caracteres; o máximo é ${ITEM_MAX.plain}`)
+                        secret(caption, at)
+                        numbers(caption, at)
+                    }
+                }
+            }
+        }
+    }
 
     const ids = beats.map((beat) => beat?.id)
     beats.forEach((raw, index) => {
@@ -228,10 +275,22 @@ export function validateSpec(spec, { fileExists } = {}) {
         if (last && beat.items != null) err(`${where} items: o fechamento não tem itens`)
         if (last && beat.image != null) err(`${where} image: o fechamento não tem imagem`)
 
-        // Regra 7: image
-        if (beat.image != null) {
+        // Regra 11 (A03b): code, trecho real de arquivo; exclusivo com image; sem no fechamento
+        if (beat.code != null) {
+            if (last) err(`${where} code: o fechamento não tem código`)
+            else {
+                if (beat.image != null) err(`${where} code: não pode vir junto com image`)
+                codeRules(beat.code, where)
+            }
+        }
+
+        // Regra 7: image ou code, ate 3 itens
+        if (beat.image != null || beat.code != null) {
             const count = Array.isArray(beat.items) ? beat.items.length : 0
-            if (count > IMAGE_ITEMS_MAX) err(`${where} items: ${count} itens com imagem; o máximo é ${IMAGE_ITEMS_MAX}`)
+            const kind = beat.code != null ? 'código' : 'imagem'
+            if (count > IMAGE_ITEMS_MAX) err(`${where} items: ${count} itens com ${kind}; o máximo é ${IMAGE_ITEMS_MAX}`)
+        }
+        if (beat.image != null) {
             if (!isStr(beat.image) || !IMAGE_EXT.test(beat.image)) {
                 err(`${where} image: extensão precisa ser .png, .jpg ou .jpeg`)
             } else if (!fileExists(beat.image)) {

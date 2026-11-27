@@ -215,7 +215,9 @@ export function buildScript(spec, kind, lang, durations) {
 
   const beats = timeline.beats.map((tb, i) => {
     const src = source[i]
-    const placed = placeItems(src.items || [], { speechStart: tb.speechStart, speechEnd: tb.speechEnd, kind })
+    // Sem items, a legenda do código (code.caption) vira o primeiro item do beat.
+    const own = src.items?.length ? src.items : src.code?.caption ? [src.code.caption] : []
+    const placed = placeItems(own, { speechStart: tb.speechStart, speechEnd: tb.speechEnd, kind })
     return {
       id: tb.id,
       index: i,

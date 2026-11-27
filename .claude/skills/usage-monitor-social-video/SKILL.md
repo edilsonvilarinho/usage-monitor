@@ -30,7 +30,7 @@ imagens). Mídia fica fora: `build/social-video/<slug>/` e `~/Videos/usage-monit
    - **Curto:** teto medido de 630 caracteres por idioma (12,2 caracteres/s); cada fala tem uma ação e um porquê.
    - **Longo:** até 3500 caracteres em 300 s (7000 em `longSeconds` 600), no máximo 20 etapas (30 em 600 s), cada uma com 2 a 4 frases, abrindo com o contexto e fechando com um caso real.
    - Fala curta, sem jargão desnecessário; `facts` lista todo número usado.
-3. **Conferência.** `node <skill>/scripts/make.mjs check <video.json>`. Erro de teto se resolve cortando texto, nunca acelerando voz.
+3. **Conferência.** `node <skill>/scripts/make.mjs check <video.json>`. Erro de teto se resolve cortando texto, nunca acelerando voz. Beat com `code` mostra um trecho de arquivo do repo (contrato em `references/video-spec.md`, Código).
 4. **Prévia, sem gastar API.** `node <skill>/scripts/make.mjs preview <video.json>`: gera linha do tempo estimada e quadros em
    `build/social-video/<slug>/qa/`, com folha de contato `sheet.jpg`. **Olhe a folha você mesmo**: texto cortado, sobreposição, imagem
    ilegível ou faixa de legenda invadida voltam para o `video.json`.
