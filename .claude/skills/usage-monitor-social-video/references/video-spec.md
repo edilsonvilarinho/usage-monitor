@@ -53,6 +53,8 @@ Beat opcional `code: { file, from, to, caption? }`, no lugar de `image` (os dois
 
 ## Cena explica (`scene`, `markers`, `diagram`, `code.highlight`, `at`)
 
+Design (composições, tokens, movimento e recusas do dono): [`visual-explica.md`](visual-explica.md).
+
 Raiz opcional `"scene": "explica"`: a cena explicativa (`assets/scene-explica.js`) só vale no corte longo; o curto segue com a cena atual. Ausente = cena atual. Outro valor é erro (`scene: use "explica" ou ausente`).
 
 Campos opcionais de beat, todos com texto `{pt, en}`:
