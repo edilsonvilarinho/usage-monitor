@@ -45,7 +45,8 @@ esconde o eixo fraco.
 | A01 | Este plano | `docs/planos/` |
 | A02 | Script com parte pura testada e casca `gh`/API | `tools/ci/repo-benchmark.mjs`, `tools/ci/repo-benchmark-peers.json`, `tools/ci/test/repo-benchmark.test.mjs` |
 | A03 | Saída HTML no design system (`--html`), pedido do dono em 2026-11-27 | `tools/ci/repo-benchmark.mjs`, teste |
-| A04 | Rodar contra o grupo e registrar a linha de base | `docs/planos/` |
+| A04 | PRs no teto de 1000 da busca do GitHub aparecem como `≥1000` | `tools/ci/repo-benchmark.mjs`, teste |
+| A05 | Rodar contra o grupo e registrar a linha de base | `docs/planos/` |
 
 ## Ponto de situação
 
@@ -53,6 +54,7 @@ esconde o eixo fraco.
 |---|---|---|
 | A01 | feito | plano escrito; fatos medidos com os comandos citados acima |
 | A02 | feito | vermelho: `node --test tools/ci/test/repo-benchmark.test.mjs` sobre stubs, exit 1, `Expected values to be strictly deep-equal` (actual `{ score: null, date: null, checks: [] }`, expected `{ score: 6.4, … }`) e `actual: 0, expected: 1`; verde: mesmo comando, `tests 12, pass 12, fail 0`; `node --test "tools/ci/test/*.test.mjs"`: `tests 543, pass 543, fail 0`. Percentil por piso; posição contra o grupo inteiro (7 repositórios); só o agregado do Scorecard entra no relatório |
+| A03 | feito | vermelho: `node --test tools/ci/test/repo-benchmark.test.mjs` com `renderHtml` stub, 23 testes, 11 falhas na asserção (`Expected values to be strictly equal`, `The expression evaluated to a falsy value`); devolução 1 (tabela vazava do painel a 1280px): vermelho `The input did not match the regular expression /<div class="scroll">\s*<table>/`; devolução 2 (página rolava na horizontal a 420px): o teste da coluna única foi escrito depois do CSS, **sem vermelho registrado**; verde: `node --test "tools/ci/test/*.test.mjs"`, `tests 556, pass 556, fail 0`. Conferido pelo orquestrador no Chrome headless: 1280px sem vazamento, iframe de 420px em coluna única, `scrollWidth` 405 |
 
 ## Problemas em aberto e riscos
 

@@ -1,4 +1,4 @@
-import { AXES, buildReport, deliveryMetrics, rankAxis, renderMarkdown, scorecardFromJson } from '../repo-benchmark.mjs'
+import { AXES, buildReport, deliveryMetrics, parseArgs, rankAxis, renderHtml, renderMarkdown, scorecardFromJson } from '../repo-benchmark.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -126,4 +126,111 @@ test('markdown: null vira traco; taxa de revert com virgula; lista de posicao co
         '- medianMergeHours: 1º de 2 (percentil 100)',
         '- revertRate: 1º de 2 (percentil 100)',
     ])
+})
+
+// ---- HTML (#687, A03): renderHtml sobre um relatorio falso, sem rede ----
+
+const htmlReport = () => ({
+    target: 'T/usage-monitor',
+    rows: [
+        { repo: 'T/usage-monitor', group: 'target', scorecard: 6.4, releases: 2, mergedPrs: 10, medianMergeHours: 12.5, revertRate: 0.009 },
+        { repo: 'A/one', group: 'same-goal', scorecard: 7.5, releases: null, mergedPrs: 3, medianMergeHours: 1, revertRate: 0 },
+        { repo: 'B/<two>', group: 'large-stack', scorecard: 3, releases: 5, mergedPrs: 4, medianMergeHours: 30, revertRate: 0.1 },
+    ],
+    targetPositions: {
+        scorecard: { position: 1, of: 5, percentile: 80 },
+        releases: { position: 3, of: 5, percentile: 50 },
+        medianMergeHours: { position: 5, of: 5, percentile: 10 },
+        revertRate: { position: null, of: 3, percentile: null },
+    },
+})
+const HTML_OPTIONS = { generatedAt: '2026-11-27T00:00:00.000Z', windowDays: 90 }
+
+test('html: documento comeca com doctype, lang pt-BR, charset e viewport', () => {
+    const html = renderHtml(htmlReport(), HTML_OPTIONS)
+    assert.equal(html.slice(0, 15), '<!doctype html>')
+    assert.match(html, /<html lang="pt-BR">/)
+    assert.match(html, /<meta charset="utf-8">/i)
+    assert.match(html, /<meta name="viewport"/)
+})
+
+test('html: cabecalho traz eyebrow, titulo, data de geracao e janela', () => {
+    const html = renderHtml(htmlReport(), HTML_OPTIONS)
+    assert.ok(html.includes('usage-monitor · benchmark de repositório'))
+    assert.ok(html.includes('Posição no grupo'))
+    assert.ok(html.includes('gerado em 2026-11-27T00:00:00.000Z'))
+    assert.ok(html.includes('janela de 90 dias'))
+})
+
+test('html: contem os quatro rotulos de eixo', () => {
+    const html = renderHtml(htmlReport(), HTML_OPTIONS)
+    for (const label of ['OpenSSF Scorecard', 'Releases em 90 dias', 'Mediana até o merge', 'Taxa de revert']) {
+        assert.ok(html.includes(label), label)
+    }
+})
+
+test('html: autocontido, sem script e sem recurso externo alem do Google Fonts', () => {
+    const html = renderHtml(htmlReport(), HTML_OPTIONS)
+    assert.ok(!html.includes('<script'), 'nao deve haver <script>')
+    const urls = html.match(/https?:\/\/[^"') ]+/g) ?? []
+    assert.equal(urls.length, 1, urls.join(' '))
+    assert.ok(urls[0].startsWith('https://fonts.googleapis.com/'), urls[0])
+})
+
+test('html: alvo com position null gera nao medido e nivel off', () => {
+    const html = renderHtml(htmlReport(), HTML_OPTIONS)
+    assert.ok(html.includes('data-axis="revertRate" data-level="off"'))
+    assert.ok(html.includes('não medido'))
+})
+
+test('html: percentil 80 e ok, 50 e warn, 10 e crit', () => {
+    const html = renderHtml(htmlReport(), HTML_OPTIONS)
+    assert.ok(html.includes('data-axis="scorecard" data-level="ok"'))
+    assert.ok(html.includes('data-axis="releases" data-level="warn"'))
+    assert.ok(html.includes('data-axis="medianMergeHours" data-level="crit"'))
+})
+
+test('html: nome de repositorio com < sai escapado', () => {
+    const html = renderHtml(htmlReport(), HTML_OPTIONS)
+    assert.ok(html.includes('B/&lt;two&gt;'))
+    assert.ok(!html.includes('B/<two>'))
+    const quoted = renderHtml({ ...htmlReport(), rows: [{ ...htmlReport().rows[0], repo: `a&"'<b>` }] }, HTML_OPTIONS)
+    assert.ok(quoted.includes('a&amp;&quot;&#39;&lt;b&gt;'))
+})
+
+test('html: tabela tem traco para nulo e taxa com virgula; alvo destacado', () => {
+    const html = renderHtml(htmlReport(), HTML_OPTIONS)
+    assert.ok(html.includes('—'))
+    assert.ok(html.includes('0,9%'))
+    assert.ok(html.includes('<tr class="target">'))
+})
+
+test('html: eixo com nulo diz quantos nao medidos', () => {
+    const html = renderHtml(htmlReport(), HTML_OPTIONS)
+    assert.ok(html.includes('1 não medido'))
+})
+
+test('html: CSS traz os tokens de fundo escuro e claro', () => {
+    const html = renderHtml(htmlReport(), HTML_OPTIONS)
+    assert.ok(html.includes('#131010'))
+    assert.ok(html.includes('#F6F3F3'))
+})
+
+test('args: --html grava o caminho; ausente vira null', () => {
+    assert.equal(parseArgs(['--html', 'out.html']).html, 'out.html')
+    assert.equal(parseArgs([]).html, null)
+})
+
+test('html: tabela dentro de contêiner com overflow-x auto; a pagina nao rola', () => {
+    const html = renderHtml(htmlReport(), HTML_OPTIONS)
+    assert.match(html, /<div class="scroll">\s*<table>/)
+    assert.match(html, /<\/table>\s*<\/div>/)
+    assert.match(html, /\.scroll \{[^}]*overflow-x: auto/)
+})
+
+test('html: tela estreita tem coluna unica nos cartoes e barras sem estouro', () => {
+    const html = renderHtml(htmlReport(), HTML_OPTIONS)
+    assert.match(html, /@media \(max-width: 600px\) \{[^@]*\.cards \{ grid-template-columns: 1fr/)
+    assert.match(html, /@media \(max-width: 600px\) \{[^@]*\.bar-name \{ grid-column: 1 \/ -1/)
+    assert.match(html, /\.bar-name \{ min-width: 0/)
 })
