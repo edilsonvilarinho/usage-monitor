@@ -41,8 +41,11 @@ zerar o contexto vivo nem trocar o modelo do último turno, na lista e no detalh
 
 | Id | Comando | Resultado |
 |---|---|---|
-| A01 | `git log -1` | plano commitado |
+| A01 | `git log -1` | plano commitado (`76bfb140`) |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalCliSessionDataSourceTest" --tests "com.usagemonitor.domain.CliSessionAnalyticsTest" --tests "*ArchitectureRulesTest*"` | `LocalCliSessionDataSourceTest.kt:534` e `CliSessionAnalyticsTest.kt:95`: `expected:<50000> but was:<0>` |
+| A02 | verde: mesmo comando (`backend-dev`) | exit 0; 168 testes, 0 falhas (`LocalCliSessionDataSourceTest` 65, `CliSessionAnalyticsTest` 26, regras de arquitetura 77) |
+| A02 | `test-runner`: mesmo recorte + `koverXmlReport -Pcoverage`; `node tools/ci/diff-coverage.mjs --base origin/main --kover build/reports/kover/report.xml` | 168/168; diff 1/1 linha instrumentada (100%) — o SQL é string, sem linha própria no Kover; coberto pelo teste do `LocalCliSessionDataSourceTest` |
 
 ## Problemas em aberto e riscos
 
-- Critério "contexto indisponível" da #690 fica fora desta entrega; issue de continuação aberta para o estado anulável.
+- Critério "contexto indisponível" da #690 fica fora desta entrega; continuação na #694 (estado anulável).

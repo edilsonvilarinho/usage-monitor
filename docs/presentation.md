@@ -208,6 +208,10 @@ Plano e pontos de situação em `docs/planos/analise-sessao-execucao.md`; galeri
 - **Relatório PDF** (B21b): botão na barra da janela, o mesmo PDF de uma página do `/analise pdf` e o mesmo nome de
   arquivo, gravado pelo `UsageExportWriter` com o payload novo `UsageExportPayload.Binary` (bytes prontos; não é `data
   class`). Cancelar o diálogo não publica nada; salvo ou falha vira `AppBanner`, como na Comparação.
+- **Aviso `<synthetic>`** (#690): o Claude Code grava limite, erro 429 e saldo como `assistant` com modelo `<synthetic>` e uso
+  zero. Esse turno nunca define o contexto vivo nem o modelo do último turno, na lista e no detalhe (filtro no SQL de
+  `SELECT_LIVE_CONTEXTS_SQL`/`SELECT_LIVE_CONTEXT_BY_SESSION_SQL` e no `ComputeCliSessionAnalyticsUseCase`). Continua contando em
+  "turns" e "per message", com tokens e custo zero.
 
 ## Análise: diagonal legível e período (#538)
 

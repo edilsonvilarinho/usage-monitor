@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
+import com.usagemonitor.domain.entity.SYNTHETIC_MODEL_ID
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import kotlin.time.Instant
 import kotlin.test.Test
@@ -79,6 +80,23 @@ class CliSessionAnalyticsTest {
 
         // 20.000 tokens x USD 0,50/M = 10.000 micros.
         assertEquals(10_000L, computeAnalytics(detail).nextInteractionCostMicros)
+    }
+
+    @Test
+    fun `synthetic turn after the real one keeps the live context and the next cost`() {
+        val realOnly = computeAnalytics(detail(turn(seq = 1, cacheReadTokens = 50_000L)))
+        val withSynthetic = computeAnalytics(
+            detail(
+                turn(seq = 1, cacheReadTokens = 50_000L),
+                turn(seq = 2, model = SYNTHETIC_MODEL_ID)
+            )
+        )
+
+        assertEquals(50_000L, withSynthetic.liveContextTokens)
+        assertEquals(realOnly.nextInteractionCostMicros, withSynthetic.nextInteractionCostMicros)
+        assertEquals(realOnly.contextSaturation, withSynthetic.contextSaturation)
+        // O aviso continua contando como turno, mas sem tokens nem custo.
+        assertEquals(2, withSynthetic.mainTurnCount)
     }
 
     @Test
