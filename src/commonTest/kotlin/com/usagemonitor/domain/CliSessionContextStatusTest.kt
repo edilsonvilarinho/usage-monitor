@@ -137,4 +137,23 @@ class CliSessionContextStatusTest {
             cacheReadTokens = cacheReadTokens
         )
     }
+
+    /** Contexto não medido não tem saturação nem custo estimado: nunca zero disfarçado. */
+    @Test
+    fun `unmeasured live context has no saturation and no next cost`() {
+        val status = computeContextStatus(liveContextTokens = null, windowModel = OPUS_5, lastTurnModel = OPUS_5)
+
+        assertNull(status.liveContextTokens)
+        assertNull(status.contextSaturation)
+        assertEquals(0L, status.nextInteractionCostMicros)
+    }
+
+    /** Zero medido com janela conhecida é saturação zero, não "não medido". */
+    @Test
+    fun `measured zero live context has zero saturation`() {
+        val status = computeContextStatus(liveContextTokens = 0L, windowModel = OPUS_5, lastTurnModel = OPUS_5)
+
+        assertEquals(0L, status.liveContextTokens)
+        assertEquals(0.0, status.contextSaturation)
+    }
 }

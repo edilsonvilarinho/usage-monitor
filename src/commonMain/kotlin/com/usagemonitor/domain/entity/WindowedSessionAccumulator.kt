@@ -24,7 +24,7 @@ class WindowedSessionAccumulator(
     private val cwd: String? = null,
     private val gitBranch: String? = null,
     private val hostName: String? = null,
-    private val liveContextTokens: Long = 0L,
+    private val liveContextTokens: Long? = null,
     private val liveContextModel: String? = null,
     private val stale: Boolean = false
 ) {

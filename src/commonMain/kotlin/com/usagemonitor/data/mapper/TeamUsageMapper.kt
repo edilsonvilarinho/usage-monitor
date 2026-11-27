@@ -63,7 +63,7 @@ fun TeamIngestPayload.toDto(): TeamIngestRequestDto {
                 gitBranch = session.gitBranch,
                 firstTs = session.firstTs.toEpochMilliseconds(),
                 lastTs = session.lastTs.toEpochMilliseconds(),
-                liveContextTokens = session.liveContextTokens,
+                liveContextTokens = session.liveContextTokens ?: 0L,
                 liveContextModel = session.liveContextModel
             )
         },

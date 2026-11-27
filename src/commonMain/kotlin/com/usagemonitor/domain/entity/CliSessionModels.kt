@@ -108,7 +108,7 @@ data class CliSessionSummary(
      * propriedade do estado atual dela, e recortá-la por janela de quota daria um
      * número sem significado.
      */
-    val liveContextTokens: Long = 0L,
+    val liveContextTokens: Long? = null,
     /** Modelo desse último turno principal; define a tarifa da próxima mensagem. */
     val liveContextModel: String? = null,
     /**

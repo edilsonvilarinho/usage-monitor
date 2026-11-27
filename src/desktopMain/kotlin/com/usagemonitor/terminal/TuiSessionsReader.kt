@@ -86,7 +86,7 @@ internal class TuiSessionsReader(
             costMicros = session.costMicros,
             costIncomplete = !session.isCostComplete,
             throughput = session.throughput,
-            contextTokens = session.liveContextTokens.takeIf { tokens -> tokens > 0L },
+            contextTokens = session.liveContextTokens,
             contextWindow = ModelContextWindowTable.forModel(session.liveContextModel ?: session.primaryModel),
             modelMix = session.modelMix
         )

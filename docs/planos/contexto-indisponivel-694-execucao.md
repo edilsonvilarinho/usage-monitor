@@ -57,7 +57,10 @@ Comandos: `Grep liveContextTokens src/`, varredura do `explorer` sobre `CliSessi
 
 | Id | Comando | Resultado |
 |---|---|---|
-| A01 | `git log -1` | plano commitado |
+| A01 | `git log -1` | plano commitado (`3f7adc63`) |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalCliSessionDataSourceTest"` (`backend-dev`) | `LocalCliSessionDataSourceTest.kt:543` (só subagente) e `:562` (só `<synthetic>`): `AssertionError`, esperado `null`, era `0`; 67 testes, 2 falhas |
+| A02 | vermelho por reversão temporária da linha de produção (`backend-dev`) | `CliSessionAnalyticsTest.kt:27,34`: `expected null, but was:<0.0>`; `UsageExporterTest.kt:32,39`: `Expected value to be true.`; `TuiSessionsReaderTest.kt:36`: `expected null, but was:<0>`; zero medido: `expected:<0> but was:<null>` |
+| A02 | verde: `gradlew.bat desktopTest --rerun --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.domain.*" --tests "com.usagemonitor.terminal.TuiSessionsReaderTest" --tests "*ArchitectureRulesTest*"` (`test-runner`) | exit 0; 1400 testes, 0 falhas, 0 erros. Os 2 casos novos de `CliSessionContextStatusTest` não tiveram vermelho próprio (escritos junto do código) |
 
 ## Problemas em aberto e riscos
 

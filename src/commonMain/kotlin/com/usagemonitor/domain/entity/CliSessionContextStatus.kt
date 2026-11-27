@@ -10,8 +10,9 @@ package com.usagemonitor.domain.entity
  * caminhos passam por aqui.
  */
 data class CliSessionContextStatus(
-    val liveContextTokens: Long = 0L,
-    /** `null` quando a janela do modelo não é conhecida — nunca se assume um valor. */
+    /** `null` quando o turno da thread principal não foi medido — nunca se assume zero. */
+    val liveContextTokens: Long? = null,
+    /** `null` quando a janela do modelo não é conhecida ou o contexto não foi medido. */
     val contextSaturation: Double? = null,
     val nextInteractionCostMicros: Long = 0L
 ) {
@@ -41,26 +42,33 @@ data class CliSessionContextStatus(
  * Deriva o status a partir do contexto vivo — o `cache_read` do último turno da
  * thread principal, que é o volume reenviado na próxima mensagem.
  *
+ * [liveContextTokens] `null` é "não medido": sem saturação e sem custo estimado.
  * [windowModel] é o modelo predominante da sessão e define a janela de contexto.
  * [lastTurnModel] é o modelo do último turno e define a tarifa de cache read:
  * é ele que vai reenviar o contexto. Numa sessão que não trocou de modelo os
  * dois coincidem.
  */
 fun computeContextStatus(
-    liveContextTokens: Long,
+    liveContextTokens: Long?,
     windowModel: String?,
     lastTurnModel: String?
 ): CliSessionContextStatus {
     val contextWindow = ModelContextWindowTable.forModel(windowModel)?.takeIf { window -> window > 0L }
     val pricing = ModelPricingTable.forModel(lastTurnModel)
+    val saturation = if (liveContextTokens == null || contextWindow == null) {
+        null
+    } else {
+        liveContextTokens.toDouble() / contextWindow.toDouble()
+    }
+    val nextCostMicros = if (liveContextTokens == null || pricing == null) {
+        0L
+    } else {
+        liveContextTokens * pricing.forPrompt(liveContextTokens).cacheReadMicrosPerMillion / MICROS_PER_USD
+    }
 
     return CliSessionContextStatus(
         liveContextTokens = liveContextTokens,
-        contextSaturation = contextWindow?.let { window -> liveContextTokens.toDouble() / window.toDouble() },
-        nextInteractionCostMicros = if (pricing == null) {
-            0L
-        } else {
-            liveContextTokens * pricing.forPrompt(liveContextTokens).cacheReadMicrosPerMillion / MICROS_PER_USD
-        }
+        contextSaturation = saturation,
+        nextInteractionCostMicros = nextCostMicros
     )
 }

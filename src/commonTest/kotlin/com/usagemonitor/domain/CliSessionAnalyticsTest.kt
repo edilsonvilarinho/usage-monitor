@@ -21,6 +21,20 @@ class CliSessionAnalyticsTest {
     private val computeAnalytics = ComputeCliSessionAnalyticsUseCase()
 
     @Test
+    fun `a session with only synthetic turns has no measured context saturation`() {
+        val analytics = computeAnalytics(detail(turn(seq = 1, model = SYNTHETIC_MODEL_ID)))
+
+        assertNull(analytics.contextSaturation)
+    }
+
+    @Test
+    fun `a session with only sidechain turns has no measured context saturation`() {
+        val analytics = computeAnalytics(detail(turn(seq = 1, cacheReadTokens = 900_000L, isSidechain = true)))
+
+        assertNull(analytics.contextSaturation)
+    }
+
+    @Test
     fun `cache hit rate uses reads over reads plus writes`() {
         val summary = summary(cacheReadTokens = 800L, cacheWrite5mTokens = 100L, cacheWrite1hTokens = 100L)
 

@@ -35,7 +35,7 @@ class ComputeCliSessionAnalyticsUseCase {
         // Mesmo cálculo que a lista faz a partir do índice: um único caminho para
         // que os dois nunca divirjam.
         val contextStatus = computeContextStatus(
-            liveContextTokens = lastMainTurn?.cacheReadTokens ?: 0L,
+            liveContextTokens = lastMainTurn?.cacheReadTokens,
             windowModel = detail.summary.primaryModel,
             lastTurnModel = lastMainTurn?.model
         )
@@ -44,7 +44,7 @@ class ComputeCliSessionAnalyticsUseCase {
             cacheHitRate = detail.summary.cacheHitRate,
             cacheSavingsMicros = turns.sumOf { turn -> turn.cacheSavingsMicros ?: 0L },
             averageContextPerTurn = averageContext(mainTurns),
-            liveContextTokens = contextStatus.liveContextTokens,
+            liveContextTokens = contextStatus.liveContextTokens ?: 0L,
             nextInteractionCostMicros = contextStatus.nextInteractionCostMicros,
             contextSaturation = contextStatus.contextSaturation,
             costBreakdown = breakdown,
@@ -83,7 +83,7 @@ class ComputeCliSessionAnalyticsUseCase {
 
         return CliSessionAnalytics(
             cacheHitRate = summary.cacheHitRate,
-            liveContextTokens = status.liveContextTokens,
+            liveContextTokens = status.liveContextTokens ?: 0L,
             nextInteractionCostMicros = status.nextInteractionCostMicros,
             contextSaturation = status.contextSaturation,
             unpricedTurnCount = summary.unpricedTurnCount,

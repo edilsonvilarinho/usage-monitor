@@ -496,7 +496,7 @@ class LocalCliSessionDataSource(
                             cwd = rows.getString("cwd"),
                             gitBranch = rows.getString("git_branch"),
                             hostName = rows.getString("host_name"),
-                            liveContextTokens = liveContext?.cacheReadTokens ?: 0L,
+                            liveContextTokens = liveContext?.cacheReadTokens,
                             liveContextModel = liveContext?.model,
                             stale = !File(filePath).isFile
                         )
@@ -677,7 +677,7 @@ class LocalCliSessionDataSource(
             cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens"),
             costMicros = rows.getLong("cost_micros"),
             unpricedTurnCount = rows.getInt("unpriced_turns"),
-            liveContextTokens = liveContext?.cacheReadTokens ?: 0L,
+            liveContextTokens = liveContext?.cacheReadTokens,
             liveContextModel = liveContext?.model,
             stale = !File(filePath).isFile
         )
