@@ -1,5 +1,7 @@
 const { AppWindowFrame, AppToolbar, AppTabs, AppSegmentedControl, AppTextField, AppButton, AppPanel, AppPanelHeader, AppPanelBody, AppDataRow, AppKey, AppValue, AppStatusIndicator, AppColumnHeader, AppDataTable, AppMetric, AppEmptyState, AppSourceMark } = DS;
 
+// #694: saude null = contexto não medido (sem turno real na thread principal).
+// A linha mostra "Contexto indisponível" em tom neutro, nunca "Saudável".
 const SESSIONS = [
   { id: '7c4a1f92', projeto: 'api-gateway', branch: 'feat/rate-limit', modelo: 'sonnet-4-5', turnos: 48, tokens: '1 284 000', custo: 'US$ 3,1841', ativo: '2h 41m', vazao: '94 tok/s', saude: 'crit', veredito: 'Saturada', mix: 'sonnet-4-5 78% · opus-4-1 19% · haiku-4-5 3%' },
   { id: 'b81e35c0', projeto: 'checkout-web', branch: 'main', modelo: 'sonnet-4-5', turnos: 26, tokens: '612 400', custo: 'US$ 1,6279', ativo: '1h 08m', vazao: '118 tok/s', saude: 'warn', veredito: 'Atenção', mix: 'sonnet-4-5 100%' },
@@ -30,7 +32,7 @@ function SessionRow({ s, last, onOpen }) {
         {s.saude ? (
           <AppStatusIndicator level={s.saude} title={'Contexto vivo contra a janela do modelo ' + s.modelo}>{s.veredito}</AppStatusIndicator>
         ) : (
-          <AppKey dim>sem veredito</AppKey>
+          <AppStatusIndicator level="off" title="Sem turno da thread principal: o contexto não foi medido.">Contexto indisponível</AppStatusIndicator>
         )}
       </span>
     </div>

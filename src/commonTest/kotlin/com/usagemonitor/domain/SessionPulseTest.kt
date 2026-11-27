@@ -59,6 +59,16 @@ class SessionPulseTest {
     }
 
     @Test
+    fun `a session with unmeasured live context never becomes an alert`() {
+        val unmeasured = session("a", SATURATED_CONTEXT_TOKENS, NOW).copy(liveContextTokens = null)
+
+        val pulse = listOf(unmeasured).toSessionPulse(NOW)
+
+        assertTrue(pulse.alerts.isEmpty(), "sessão sem contexto medido não pode virar alerta: ${pulse.alerts}")
+        assertFalse(pulse.isPulsing)
+    }
+
+    @Test
     fun `severities are distinct and ordered by severity`() {
         val pulse = listOf(
             session("saturada", SATURATED_CONTEXT_TOKENS, NOW),

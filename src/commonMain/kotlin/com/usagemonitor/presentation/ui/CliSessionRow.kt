@@ -334,7 +334,7 @@ internal fun CliSessionRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AppStatusIndicator(
-                    label = CliSessionsLabels.healthShort(status.health, language),
+                    label = CliSessionsLabels.contextHealthShort(status.health, language),
                     tone = statusTone
                 )
                 // Ponto e palavra, como o veredito ao lado: a marca não pode ser
@@ -349,9 +349,10 @@ internal fun CliSessionRow(
                     )
                 }
                 Text(
-                    text = CliSessionsLabels.healthReason(
+                    text = CliSessionsLabels.contextHealthReason(
+                        health = status.health,
                         saturationLabel = status.contextSaturation?.let { value -> formatPercent(value) },
-                        nextCostLabel = formatMicrosUsd(status.nextInteractionCostMicros),
+                        nextCostLabel = (status.nextInteractionCostMicros?.let { micros -> formatMicrosUsd(micros) } ?: "—"),
                         language = language
                     ),
                     style = MaterialTheme.typography.labelSmall,

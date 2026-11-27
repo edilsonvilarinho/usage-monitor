@@ -44,7 +44,7 @@ class ComputeCliSessionAnalyticsUseCase {
             cacheHitRate = detail.summary.cacheHitRate,
             cacheSavingsMicros = turns.sumOf { turn -> turn.cacheSavingsMicros ?: 0L },
             averageContextPerTurn = averageContext(mainTurns),
-            liveContextTokens = contextStatus.liveContextTokens ?: 0L,
+            liveContextTokens = contextStatus.liveContextTokens,
             nextInteractionCostMicros = contextStatus.nextInteractionCostMicros,
             contextSaturation = contextStatus.contextSaturation,
             costBreakdown = breakdown,
@@ -83,7 +83,7 @@ class ComputeCliSessionAnalyticsUseCase {
 
         return CliSessionAnalytics(
             cacheHitRate = summary.cacheHitRate,
-            liveContextTokens = status.liveContextTokens ?: 0L,
+            liveContextTokens = status.liveContextTokens,
             nextInteractionCostMicros = status.nextInteractionCostMicros,
             contextSaturation = status.contextSaturation,
             unpricedTurnCount = summary.unpricedTurnCount,

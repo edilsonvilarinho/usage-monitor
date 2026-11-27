@@ -2,7 +2,6 @@ package com.usagemonitor.data
 
 import com.usagemonitor.data.datasource.LocalCliSessionDataSource
 import com.usagemonitor.domain.entity.CliProjectRoot
-import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionTailOutcome
 import com.usagemonitor.domain.entity.SYNTHETIC_MODEL_ID
 import com.usagemonitor.domain.entity.activeTimeMillisOf
@@ -552,7 +551,7 @@ class LocalCliSessionDataSourceTest {
             val session = dataSource.readSessions().single()
             assertNull(session.liveContextTokens)
             assertNull(session.liveContextModel)
-            assertEquals(CliSessionHealth.HEALTHY, session.contextStatus.health)
+            assertNull(session.contextStatus.health)
             assertNull(assertNotNull(dataSource.readSession("session-a")).summary.liveContextTokens)
         }
     }

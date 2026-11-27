@@ -14,23 +14,29 @@ data class CliSessionContextStatus(
     val liveContextTokens: Long? = null,
     /** `null` quando a janela do modelo não é conhecida ou o contexto não foi medido. */
     val contextSaturation: Double? = null,
-    val nextInteractionCostMicros: Long = 0L
+    /** `null` quando o contexto não foi medido: sem contexto não há custo estimado. */
+    val nextInteractionCostMicros: Long? = null
 ) {
     /**
      * Quanto da janela já está ocupado e quanto custa continuar, avaliados em
      * paralelo: numa janela pequena a fração pode ser modesta e a mensagem ainda
      * assim sair cara.
      */
-    val health: CliSessionHealth
+    val health: CliSessionHealth?
         get() {
+            // Contexto não medido não tem veredito: `null` é "indisponível", não HEALTHY.
+            if (liveContextTokens == null) {
+                return null
+            }
             val saturation = contextSaturation ?: 0.0
+            val nextCost = nextInteractionCostMicros ?: 0L
             return when {
                 saturation >= CliSessionHealthThresholds.SATURATED_WINDOW_FRACTION ||
-                    nextInteractionCostMicros >= CliSessionHealthThresholds.SATURATED_NEXT_COST_MICROS ->
+                    nextCost >= CliSessionHealthThresholds.SATURATED_NEXT_COST_MICROS ->
                     CliSessionHealth.SATURATED
 
                 saturation >= CliSessionHealthThresholds.ATTENTION_WINDOW_FRACTION ||
-                    nextInteractionCostMicros >= CliSessionHealthThresholds.ATTENTION_NEXT_COST_MICROS ->
+                    nextCost >= CliSessionHealthThresholds.ATTENTION_NEXT_COST_MICROS ->
                     CliSessionHealth.ATTENTION
 
                 else -> CliSessionHealth.HEALTHY
@@ -60,7 +66,9 @@ fun computeContextStatus(
     } else {
         liveContextTokens.toDouble() / contextWindow.toDouble()
     }
-    val nextCostMicros = if (liveContextTokens == null || pricing == null) {
+    val nextCostMicros = if (liveContextTokens == null) {
+        null
+    } else if (pricing == null) {
         0L
     } else {
         liveContextTokens * pricing.forPrompt(liveContextTokens).cacheReadMicrosPerMillion / MICROS_PER_USD

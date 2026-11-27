@@ -394,7 +394,7 @@ internal object ScreenshotFixtures {
         cacheReadTokens: Long,
         cacheWriteTokens: Long,
         costMicros: Long,
-        liveContextTokens: Long,
+        liveContextTokens: Long?,
         startedHoursAgo: Int,
         lastMinutesAgo: Int,
         activeMillis: Long,
@@ -544,10 +544,30 @@ internal object ScreenshotFixtures {
         activeMillis = 2_280_000L
     )
 
+    /** Contexto não medido (#694): a linha diz "Contexto indisponível", nunca "saudável". */
+    private val unmeasuredSession = session(
+        id = "7c2a90de4b18",
+        cwd = "/home/dev/docs-site",
+        branch = "main",
+        host = "DESKTOP-A1",
+        model = SONNET,
+        turnCount = 3,
+        inputTokens = 2_100L,
+        outputTokens = 3_400L,
+        cacheReadTokens = 0L,
+        cacheWriteTokens = 0L,
+        costMicros = 0L,
+        liveContextTokens = null,
+        startedHoursAgo = 1,
+        lastMinutesAgo = 40,
+        activeMillis = 600_000L
+    )
+
     val cliSessions: List<CliSessionSummary> = listOf(
         saturatedSession,
         attentionSession,
-        healthySession
+        healthySession,
+        unmeasuredSession
     )
 
     /**

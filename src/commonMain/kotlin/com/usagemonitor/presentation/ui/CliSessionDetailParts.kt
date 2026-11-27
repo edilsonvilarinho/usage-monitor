@@ -68,9 +68,10 @@ internal fun healthTallyColor(tally: CliSessionHealthTally): Color? {
  * está dentro de uma composição passa `AppAccents.current`.
  */
 internal fun healthColor(
-    health: CliSessionHealth,
+    health: CliSessionHealth?,
     accents: AppAccents
 ): Color {
+    if (health == null) return accents.neutral
     return when (health) {
         CliSessionHealth.HEALTHY -> accents.cacheRead
         CliSessionHealth.ATTENTION -> accents.cacheWrite
@@ -85,7 +86,8 @@ internal fun healthColor(
  * precisa da cor crua para pintar traço de gráfico, e este entrega o par
  * ponto + palavra que a lista e o detalhe usam.
  */
-internal fun healthTone(health: CliSessionHealth): AppTone {
+internal fun healthTone(health: CliSessionHealth?): AppTone {
+    if (health == null) return AppTone.NEUTRAL
     return when (health) {
         CliSessionHealth.HEALTHY -> AppTone.OK
         CliSessionHealth.ATTENTION -> AppTone.WARNING
