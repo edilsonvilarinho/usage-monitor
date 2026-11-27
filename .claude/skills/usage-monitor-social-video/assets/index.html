@@ -60,7 +60,7 @@
     const dataURL = new URL(dataParam, location.href)
     await load(dataURL.href)
     await load('wf.js')
-    await load('scene.js')
+    await load(WF.scene === 'explica' && format === '16:9' ? 'scene-explica.js' : 'scene.js')
     await Promise.all([
       document.fonts.load('600 80px "IBM Plex Mono"'),
       document.fonts.load('500 30px "IBM Plex Mono"'),
