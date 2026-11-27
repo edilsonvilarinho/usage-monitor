@@ -50,7 +50,9 @@ export function scorecardFromJson(json) {
 
 // Entrega na janela [now - windowDays, now]. Sem PR mesclado na janela, mediana e taxa de revert
 // sao null (nao medido), nunca zero. Revert: titulo que casa /^revert\b/i.
-export function deliveryMetrics({ prs, releases, now, windowDays = 90 }) {
+export const PR_LIMIT = 1000
+
+export function deliveryMetrics({ prs, releases, now, windowDays = 90, prLimit = PR_LIMIT }) {
     const end = now.getTime()
     const start = end - windowDays * DAY_MS
     const inWindow = (iso) => {
@@ -68,6 +70,7 @@ export function deliveryMetrics({ prs, releases, now, windowDays = 90 }) {
         mergedPrs: merged.length,
         medianMergeHours: hours.length === 0 ? null : round(median(hours), 1),
         revertRate: merged.length === 0 ? null : round(reverts / merged.length, 3),
+        mergedPrsTruncated: prs.length >= prLimit,
     }
 }
 
@@ -110,6 +113,7 @@ export function buildReport({ target, groups, data }) {
             mergedPrs: metrics.mergedPrs ?? null,
             medianMergeHours: metrics.medianMergeHours ?? null,
             revertRate: metrics.revertRate ?? null,
+            mergedPrsTruncated: metrics.mergedPrsTruncated ?? false,
         }
     })
     const targetPositions = {}
@@ -121,6 +125,7 @@ export function buildReport({ target, groups, data }) {
 
 const decimal = (value, digits) => value.toFixed(digits).replace('.', ',')
 const cell = (value, format = String) => (isMissing(value) ? '—' : format(value))
+const mergedCell = (row) => (row.mergedPrsTruncated && !isMissing(row.mergedPrs) ? `≥${row.mergedPrs}` : cell(row.mergedPrs))
 const formatPosition = ({ position, of, percentile }) =>
     position === null ? 'não medido' : `${position}º de ${of} (percentil ${percentile})`
 
@@ -135,7 +140,7 @@ export function renderMarkdown(report) {
             row.group,
             cell(row.scorecard, (score) => decimal(score, 1)),
             cell(row.releases),
-            cell(row.mergedPrs),
+            mergedCell(row),
             cell(row.medianMergeHours, (hours) => decimal(hours, 1)),
             cell(row.revertRate, (rate) => `${decimal(rate * 100, 1)}%`),
         ]
@@ -177,6 +182,7 @@ const FORMAT = {
     medianMergeHours: (value) => decimal(value, 1),
     revertRate: (value) => `${decimal(value * 100, 1)}%`,
 }
+const TRUNCATED_NOTE = `≥: a busca do GitHub devolve no máximo ${PR_LIMIT} PRs; mediana e taxa de revert usam os mais recentes.`
 const TABLE_HEAD = ['Repositório', 'Grupo', 'Scorecard', 'Releases 90d', 'PRs mesclados 90d', 'Mediana merge (h)', 'Taxa de revert']
 const GROUP_PILL = {
     target: ['info', 'alvo'],
@@ -238,7 +244,7 @@ function renderTableRows(report) {
                 ['mergedPrs', row.mergedPrs],
                 ['medianMergeHours', row.medianMergeHours],
                 ['revertRate', row.revertRate],
-            ].map(([key, value]) => `<td class="num">${isMissing(value) ? '—' : FORMAT[key](value)}</td>`)
+            ].map(([key, value]) => `<td class="num">${isMissing(value) ? '—' : (key === 'mergedPrs' && row.mergedPrsTruncated ? '≥' : '') + FORMAT[key](value)}</td>`)
             return `<tr${isTarget ? ' class="target"' : ''}><td>${escapeHtml(row.repo)}</td><td>${pill(tone, text)}</td>${numbers.join('')}</tr>`
         })
         .join('\n')
@@ -346,6 +352,7 @@ ${renderTableRows(report)}
 </section>
 <footer>
 ${notes}
+${report.rows.some((row) => row.mergedPrsTruncated) ? `<p>${escapeHtml(TRUNCATED_NOTE)}</p>` : ''}
 <p>null = não medido, nunca zero.</p>
 <p>Fontes: OpenSSF Scorecard API e GitHub.</p>
 </footer>
@@ -395,7 +402,7 @@ async function loadScorecard(repo, scorecardDir) {
 // Cada eixo falha sozinho: erro vira null naquele eixo e a mensagem vai para stderr.
 async function collect(repo, { scorecardDir, windowDays, now }) {
     const since = new Date(now.getTime() - windowDays * DAY_MS).toISOString().slice(0, 10)
-    const metrics = { scorecard: null, releases: null, mergedPrs: null, medianMergeHours: null, revertRate: null }
+    const metrics = { scorecard: null, releases: null, mergedPrs: null, medianMergeHours: null, revertRate: null, mergedPrsTruncated: false }
     try {
         metrics.scorecard = (await loadScorecard(repo, scorecardDir))?.score ?? null
     } catch (error) {
@@ -404,7 +411,7 @@ async function collect(repo, { scorecardDir, windowDays, now }) {
     let prs = null
     try {
         const search = `merged:>=${since}`
-        prs = JSON.parse(gh(['pr', 'list', '-R', repo, '--state', 'merged', '--search', search, '--limit', '1000', '--json', 'title,createdAt,mergedAt']))
+        prs = JSON.parse(gh(['pr', 'list', '-R', repo, '--state', 'merged', '--search', search, '--limit', String(PR_LIMIT), '--json', 'title,createdAt,mergedAt']))
     } catch (error) {
         warn(repo, 'PRs', error)
     }
@@ -420,6 +427,7 @@ async function collect(repo, { scorecardDir, windowDays, now }) {
         metrics.mergedPrs = delivery.mergedPrs
         metrics.medianMergeHours = delivery.medianMergeHours
         metrics.revertRate = delivery.revertRate
+        metrics.mergedPrsTruncated = delivery.mergedPrsTruncated
     }
     return metrics
 }

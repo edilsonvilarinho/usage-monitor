@@ -1,4 +1,4 @@
-import { AXES, buildReport, deliveryMetrics, parseArgs, rankAxis, renderHtml, renderMarkdown, scorecardFromJson } from '../repo-benchmark.mjs'
+import { AXES, PR_LIMIT, buildReport, deliveryMetrics, parseArgs, rankAxis, renderHtml, renderMarkdown, scorecardFromJson } from '../repo-benchmark.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -50,7 +50,38 @@ test('mediana: contagem impar pega o do meio; par faz media dos dois do meio', (
 
 test('sem PR na janela: mediana e taxa de revert sao null, nunca zero', () => {
     const metrics = deliveryMetrics({ prs: [pr('feat: a', { merged: false })], releases: [], now: NOW })
-    assert.deepEqual(metrics, { releases: 0, mergedPrs: 0, medianMergeHours: null, revertRate: null })
+    assert.deepEqual(metrics, { releases: 0, mergedPrs: 0, medianMergeHours: null, revertRate: null, mergedPrsTruncated: false })
+})
+
+test('truncado: 1000 PRs recebidos marca mergedPrsTruncated; 999 nao', () => {
+    const full = Array.from({ length: 1000 }, () => pr('feat: a'))
+    assert.equal(deliveryMetrics({ prs: full, releases: [], now: NOW }).mergedPrsTruncated, true)
+    assert.equal(deliveryMetrics({ prs: full.slice(0, 999), releases: [], now: NOW }).mergedPrsTruncated, false)
+    assert.equal(deliveryMetrics({ prs: [pr('feat: a'), pr('feat: b')], releases: [], now: NOW, prLimit: 2 }).mergedPrsTruncated, true)
+    assert.equal(PR_LIMIT, 1000)
+})
+
+test('truncado: buildReport copia mergedPrsTruncated; ausente vira false', () => {
+    const groups = { 'same-goal': ['A'] }
+    const data = new Map([['T', { mergedPrs: 1000, mergedPrsTruncated: true }], ['A', { mergedPrs: 3 }]])
+    const rows = buildReport({ target: 'T', groups, data }).rows
+    assert.equal(rows[0].mergedPrsTruncated, true)
+    assert.equal(rows[1].mergedPrsTruncated, false)
+})
+
+test('truncado: markdown mostra ≥1000 na coluna PRs mesclados', () => {
+    const report = { target: 'T', rows: [{ repo: 'T', group: 'target', scorecard: null, releases: 2, mergedPrs: 1000, mergedPrsTruncated: true, medianMergeHours: 12.5, revertRate: 0.009 }], targetPositions: Object.fromEntries(AXES.map((axis) => [axis.key, { position: null, of: 1, percentile: null }])) }
+    const lines = renderMarkdown(report).split('\n')
+    assert.deepEqual(lines.filter((line) => line.startsWith('| T |')), ['| T | target | — | 2 | ≥1000 | 12,5 | 0,9% |'])
+})
+
+test('truncado: html mostra ≥1000 e a nota de rodape; sem truncamento nao aparece', () => {
+    const report = htmlReport()
+    report.rows[0] = { ...report.rows[0], mergedPrs: 1000, mergedPrsTruncated: true }
+    const html = renderHtml(report, HTML_OPTIONS)
+    assert.ok(html.includes('≥1000'))
+    assert.ok(html.includes('<p>≥: a busca do GitHub devolve no máximo 1000 PRs; mediana e taxa de revert usam os mais recentes.</p>'))
+    assert.ok(!renderHtml(htmlReport(), HTML_OPTIONS).includes('≥'))
 })
 
 test('revert: casa Revert "x" e revert: y; nao casa Reverting z nem fix: revert flag', () => {
@@ -98,7 +129,7 @@ test('relatorio: alvo primeiro, depois grupos; posicao do alvo contra todos os p
     const data = new Map([['T', metrics(6)], ['A', metrics(9)], ['B', metrics(7)], ['C', metrics(1)]])
     const report = buildReport({ target: 'T', groups, data })
     assert.deepEqual(report.rows.map((row) => [row.repo, row.group]), [['T', 'target'], ['A', 'same-goal'], ['B', 'same-goal'], ['C', 'large-stack']])
-    assert.deepEqual(report.rows[0], { repo: 'T', group: 'target', ...metrics(6) })
+    assert.deepEqual(report.rows[0], { repo: 'T', group: 'target', ...metrics(6), mergedPrsTruncated: false })
     assert.deepEqual(report.targetPositions.scorecard, { position: 3, of: 4, percentile: 33 })
 })
 
