@@ -24,6 +24,8 @@ Ele pediu um protótipo HTML antes do vídeo e da voz, e quer manter a voz.
 
 ## Decisões
 
+- Cena nova "explica" só no corte longo, escolhida por `scene` no `video.json`; o curto e os vídeos anteriores continuam na cena atual. O estado de cada quadro é função de `t`, sem animação do CSS, porque o render tira uma captura por quadro.
+
 - A voz não muda: `eleven-v4`/`george`, mesma velocidade. O vídeo fica mais calmo com mais tempo por ideia, não com voz mais lenta.
 - Cada parte do roteiro segue a mesma ordem: o problema, o conceito, como foi feito, e um exemplo real na tela (trecho de código com
   caminho, ou captura real do app). Nenhum conceito é citado sem aparecer.
@@ -40,6 +42,8 @@ Ele pediu um protótipo HTML antes do vídeo e da voz, e quer manter a voz.
 - **A04** o roteiro explicativo (`video.json` e `roteiro.md`), com `make.mjs check`.
 - **A05** o protótipo HTML em `prototipos/video-confianca-10min/`, validado no Chrome. **Parada:** a aprovação do dono.
 - **A06** a voz, o render, a validação pelo MP4 e os posts.
+- **A07** a cena "explica" (protótipo aprovado) na skill: dados (`markers`, `diagram`, `code.highlight`, `at` por trecho da fala) e a cena determinística em DOM com `<canvas>`.
+- **A04b** o conteúdo das 29 partes nos campos novos.
 
 ## Ponto de situação
 
@@ -50,6 +54,8 @@ Ele pediu um protótipo HTML antes do vídeo e da voz, e quer manter a voz.
 | A03b | `node --test ".claude/skills/usage-monitor-social-video/scripts/test/*.test.mjs"`; `make.mjs check` e `make.mjs stage` no `video.json` da #686 | Beat com `code` (`file`, `from`, `to`): o trecho real vira PNG (Plex Mono, linhas numeradas, `file:from-to` no topo, fonte de 26 a 18 px para caber; teto de 16 linhas e 110 colunas). Vermelho: `esperado: beat "fluxo" code: não pode vir junto com image`. Verde 72/72. O `check` recusou o trecho 41-48 do `HudGeometryPropertyTest.kt` (127 colunas), trocado por 125-133. 9 cartões gerados; conferi `regra-prosa` e `propriedade` na imagem: legíveis, sem corte |
 | A03c+d | `node --test ".claude/skills/usage-monitor-social-video/scripts/test/*.test.mjs"`; `make.mjs preview … --only long-pt`; Chrome em `make.mjs serve` | Prévia jogável `qa/player-<variante>.html` (cena real no `iframe`, tocar/pausar, barra, lista de beats com o texto escrito) e `make.mjs serve` (só `GET`, só dentro do repo: `POST` 405, caminho fora 404). No Chrome: toca, pula de beat, mostra o código. A conferência dos quadros achou três defeitos, corrigidos na A03d: rótulo de item sobre o título (separação de obstáculos passou a ser o último passo); imagem pequena (painel de 58% para 70% de W, câmera z 0,72 → 0,60, imagem inteira em vez de cortada); lista com a forma falada (`writtenTexts`). Vermelho: `does not provide an export named 'writtenTexts'`. Verde 79/79, conferido pelo `test-runner`. Junta duas atividades num commit porque os dois agentes editaram os mesmos arquivos na sequência |
 | A04 | `gen-10min.mjs` → `video.json`; `make.mjs check`; `roteiro-686.mjs` | 29 beats, `longSeconds` 600. PT 6965 e EN 6833 caracteres falados (teto 7000). Cada parte: problema, conceito, como foi feito e exemplo na tela. 9 cartões de código real; capturas da HUD recortadas de `img/hud-rest.png` e `img/hud.png` (geradas fora da tela pelo `ScreenshotGenerator`, `ImageComposeScene`); 2 quadros reais do CI (run `45675713489`, `docked-top-idle`; e o defeito `hud-misplaced` do run `45672620350`). A imagem do detalhe volta no beat do teste de tela para ligar as partes. Prévia estimada a 12,2 caracteres/s: `gap` 1,28 s (EN); com os ~14 caracteres/s medidos, cerca de 3 s |
+
+| A05 | Protótipos em `prototipos/video-confianca-10min/` (fora do git), abertos no Chrome em `python -m http.server` | Rodada 1 (prévia da cena antiga), recusada pelo dono com prints: rótulo sobre o título, rótulos que se mexem presos a pontos do anel, ponto dentro do buraco negro, código "seco" e mal formatado, buraco negro "desenho". Rodada 2: três direções (`editor`, `foco`, `diagrama`); o dono aprovou a mistura (`final/`). Ajustes da rodada 3, pedidos pelo dono: buraco negro animado sempre e grande na abertura (geometria do modo flutuante, `HudFloatingHole.kt`); grande só na abertura e depois fixo no canto (ele recusou crescer e encolher a cada tópico); conteúdo entrando em 0,3 s fora da abertura (recusou o espaço vazio no início do tópico). Aprovado: "sim aprovo" |
 
 ## Problemas em aberto e riscos
 
