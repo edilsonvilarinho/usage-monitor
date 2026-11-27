@@ -158,11 +158,22 @@ function probeSeconds(file) {
   return seconds
 }
 
+// Linhas brutas do trecho de cada beat com code, lidas do arquivo real (buildScript tira a indentação comum).
+function codeLinesOf(spec) {
+  const lines = {}
+  for (const beat of spec.beats) {
+    if (!beat.code) continue
+    const { file, from, to } = beat.code
+    lines[beat.id] = codeExcerpt(readFileSync(join(repoRoot(), file), 'utf8'), from, to)
+  }
+  return lines
+}
+
 // Roteiro com duracao estimada por caracteres (preview).
 function previewScript(spec, row) {
   const durations = {}
   for (const beat of sourceBeats(spec, row.kind)) durations[beat.id] = estimateDuration(spokenOf(beat, row.kind, row.lang))
-  return buildScript(spec, row.kind, row.lang, durations)
+  return buildScript(spec, row.kind, row.lang, durations, { codeLines: codeLinesOf(spec) })
 }
 
 // Prévia jogável: qa/player-<variante>.html (iframe da cena, controles e lista de beats; sem áudio).
@@ -266,7 +277,7 @@ async function voice(spec, work, images, rows) {
   for (const { row, beats } of plan) {
     const durations = {}
     for (const beat of beats) durations[beat.id] = probeSeconds(beat.file)
-    const script = buildScript(spec, row.kind, row.lang, durations)
+    const script = buildScript(spec, row.kind, row.lang, durations, { codeLines: codeLinesOf(spec) })
     writeData(join(work, `${row.variant}.js`), script, images)
     writeFileSync(join(work, `${row.variant}.srt`), toSrt(script.captions), 'utf8')
     await buildVoiceWav(

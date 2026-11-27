@@ -5,6 +5,7 @@
 // Porta de prototipos/workflow-video-v3/final/build.mjs, sem leitura de arquivos.
 
 import { longSecondsOf } from './spec.mjs'
+import { dedentLines } from './code-card.mjs'
 
 const FIRST_MS = 1000 // primeira fala em 1,0 s
 const GAP_MIN_MS = 800 // gap mínimo entre falas
@@ -171,6 +172,32 @@ export function timeCaptions(text, speechStart, speechEnd) {
   })
 }
 
+// Instante (s) do começo de um trecho na fala: caracteres até o trecho, proporcionais a speechStart..speechEnd,
+// com o mesmo critério de timeCaptions. null se o trecho não existe no texto.
+export function phraseTime(text, phrase, speechStart, speechEnd) {
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  const wanted = phrase.replace(/\s+/g, ' ').trim()
+  const at = wanted ? normalized.indexOf(wanted) : -1
+  if (at < 0) return null
+  const parts = splitCaptions(text)
+  const total = parts.reduce((a, p) => a + p.length, 0)
+  let chars = 0
+  let pos = 0
+  for (const p of parts) {
+    const start = normalized.indexOf(p, pos)
+    if (at < start) break // trecho começa no espaço entre legendas: vale o início da próxima
+    if (at < start + p.length) {
+      chars += at - start
+      break
+    }
+    chars += p.length
+    pos = start + p.length
+  }
+  const s = toMs(speechStart)
+  const dur = toMs(speechEnd) - s
+  return sec(s + Math.round((dur * chars) / total))
+}
+
 // Cues ordenadas: um som por item (tick, red com crit, green com ok); impact em 0,6 s do último beat.
 // Sem som de abertura (pedido do dono no #684): a música entra com fade-in de 2 s.
 // Sem som de transição entre beats.
@@ -197,10 +224,44 @@ export function toSrt(captions) {
     .join('\n')
 }
 
+// Campos da cena explica de um beat: markers, diagram e code (só os que o beat tem).
+// at em segundos, no texto longo do beat; no curto é null (o longo não vai para o curto).
+// codeLines: { [beatId]: linhas do arquivo lidas pelo make.mjs }; aqui saem sem indentação comum.
+function sceneFields(src, tb, { lang, isShort, codeLines }) {
+  const at = (phrase) => (isShort ? null : phraseTime(src.long[lang], phrase, tb.speechStart, tb.speechEnd))
+  const out = {}
+  if (src.markers) {
+    out.markers = src.markers.map((m) => ({ n: m.n, x: m.x, y: m.y, label: m.label[lang], at: at(m.at[lang]) }))
+  }
+  if (src.diagram) {
+    out.diagram = {
+      type: src.diagram.type,
+      nodes: src.diagram.nodes.map((node) => ({ label: node.label[lang], tone: node.tone ?? null })),
+      back: src.diagram.back ? { label: src.diagram.back.label[lang] } : null,
+    }
+  }
+  if (src.code) {
+    out.code = {
+      file: src.code.file,
+      from: src.code.from,
+      to: src.code.to,
+      lines: dedentLines(codeLines[src.id] ?? []),
+      highlight: (src.code.highlight ?? []).map((h) => ({
+        lines: h.lines,
+        tone: h.tone,
+        note: h.note[lang],
+        at: at(h.at[lang]),
+      })),
+    }
+  }
+  return out
+}
+
 // Monta window.WF_SCRIPT. kind: 'short' | 'long'. lang: 'pt' | 'en'.
 // durations: { [beatId]: segundos da fala medida }. No curto entram só beats com short.
 // Legendas usam o texto escrito (short/long), nunca a forma falada (say).
-export function buildScript(spec, kind, lang, durations) {
+// codeLines (opcional, 5º argumento): { [beatId]: linhas brutas do trecho de código }, lidas pelo make.mjs.
+export function buildScript(spec, kind, lang, durations, { codeLines = {} } = {}) {
   if (!TIMING[kind]) throw new Error(`kind desconhecido: ${kind}`)
   const variant = kind === 'long' ? { target: longSecondsOf(spec), tail: TIMING.long.tail } : TIMING[kind]
   const isShort = kind === 'short'
@@ -233,6 +294,7 @@ export function buildScript(spec, kind, lang, durations) {
         status: it.status ?? null,
         at: it.at,
       })),
+      ...sceneFields(src, tb, { lang, isShort, codeLines }),
     }
   })
 
@@ -250,5 +312,6 @@ export function buildScript(spec, kind, lang, durations) {
     cues: buildCues(beats),
     captions,
     link: spec.link,
+    scene: kind === 'long' ? (spec.scene ?? null) : null,
   }
 }

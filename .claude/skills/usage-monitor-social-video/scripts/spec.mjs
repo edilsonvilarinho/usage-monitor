@@ -11,6 +11,11 @@ const TITLE_MAX = 34
 const ITEMS_MAX = 8
 const ITEM_MAX = { plain: 44, mono: 90 }
 const IMAGE_ITEMS_MAX = 3
+const MARKERS_MAX = 6 // cena explica: marcadores numerados sobre a imagem
+const DIAGRAM_LABEL_MAX = 28 // rótulo de nó e de volta do diagrama
+const NODE_TONES = Object.freeze(['crit', 'ok', null])
+const HIGHLIGHT_TONES = Object.freeze(['info', 'crit', 'ok'])
+const NOTE_MAX = 40 // balão de nota do destaque de código
 const SPOKEN_MAX_SHORT = 650
 const SPOKEN_MAX_LONG_AT_300 = 3500 // teto do longo em 300 s; em 600 s, 3500 × 600 / 300
 const SLUG_RE = /^[a-z0-9-]+$/
@@ -38,6 +43,9 @@ export function longSecondsOf(spec) {
 const isStr = (value) => typeof value === 'string'
 const filled = (value) => isStr(value) && value.trim() !== ''
 const len = (text) => [...text].length
+const normalizeText = (text) => text.replace(/\s+/g, ' ').trim()
+// Trecho literal: aparece no texto depois de normalizar espaços. Trecho vazio nunca aparece.
+const hasPhrase = (text, phrase) => normalizeText(phrase) !== '' && normalizeText(text).includes(normalizeText(phrase))
 
 // Regra padrao da forma falada. Palavra inteira: sem letra, numero, _ ou hifen colado.
 const SPOKEN_RULES = [
@@ -138,6 +146,9 @@ export function validateSpec(spec, { fileExists, readText = () => null } = {}) {
     if (!isStr(spec?.slug) || !SLUG_RE.test(spec.slug)) err('slug: use minúsculas, dígitos e hífen')
     if (!isStr(spec?.link) || !LINK_RE.test(spec.link)) err('link: precisa ser uma URL https://')
 
+    // Regra 12: cena opcional. "explica" vale só no corte longo (o curto segue na cena atual).
+    if (spec?.scene !== undefined && spec.scene !== 'explica') err('scene: use "explica" ou ausente')
+
     // Regra 2
     if (!beatsValid) err('beats: precisa ser uma lista')
     else if (beats.length < BEATS_MIN) err(`beats: ${beats.length} beats; o mínimo é ${BEATS_MIN}`)
@@ -196,6 +207,42 @@ export function validateSpec(spec, { fileExists, readText = () => null } = {}) {
                 }
             }
         }
+    }
+
+    // Regra 12 (cena explica): helpers de rótulo, trecho (at) e destaque de código.
+    const longOf = (beat, lang) => (isStr(beat?.long?.[lang]) ? beat.long[lang] : null)
+    const labelRules = (label, path, max) => {
+        for (const lang of LANGS) {
+            const text = label?.[lang]
+            if (!filled(text)) err(`${path}.${lang}: ausente`)
+            else if (len(text) > max) err(`${path}.${lang}: ${len(text)} caracteres; o máximo é ${max}`)
+        }
+    }
+    // at: trecho literal do long[lang] do mesmo beat. text null (sem long) já é erro do long.
+    const phraseRule = (phrase, text, path) => {
+        if (!filled(phrase)) err(`${path}: ausente`)
+        else if (text !== null && !hasPhrase(text, phrase)) err(`${path}: trecho não aparece no texto longo`)
+    }
+    const highlightRules = (code, where, beat) => {
+        if (code.highlight == null) return
+        const path = `${where} code.highlight`
+        if (!Array.isArray(code.highlight)) {
+            err(`${path}: precisa ser uma lista`)
+            return
+        }
+        const rangeOk = Number.isInteger(code.from) && Number.isInteger(code.to) && code.from >= 1 && code.from <= code.to
+        code.highlight.forEach((h, j) => {
+            const at = `${path}[${j}]`
+            const inRange = Array.isArray(h?.lines) && h.lines.every((n) => Number.isInteger(n) && n >= code.from && n <= code.to)
+            if (rangeOk && !inRange) err(`${at}.lines: use linhas dentro de ${code.from}..${code.to}`)
+            if (!HIGHLIGHT_TONES.includes(h?.tone)) err(`${at}.tone: use info, crit ou ok`)
+            for (const lang of LANGS) {
+                const note = h?.note?.[lang]
+                if (!filled(note)) err(`${at}.note.${lang}: ausente`)
+                else if (len(note) > NOTE_MAX) err(`${at}.note.${lang}: ${len(note)} caracteres; o máximo é ${NOTE_MAX}`)
+                phraseRule(h?.at?.[lang], longOf(beat, lang), `${at}.at.${lang}`)
+            }
+        })
     }
 
     const ids = beats.map((beat) => beat?.id)
@@ -281,6 +328,54 @@ export function validateSpec(spec, { fileExists, readText = () => null } = {}) {
             else {
                 if (beat.image != null) err(`${where} code: não pode vir junto com image`)
                 codeRules(beat.code, where)
+                if (isStr(beat.code.file)) highlightRules(beat.code, where, beat)
+            }
+        }
+
+        // Regra 12: markers, só com image; até 6; n = posição + 1; x e y em %; at no longo do beat
+        if (beat.markers != null) {
+            if (beat.image == null) err(`${where} markers: só com image`)
+            if (!Array.isArray(beat.markers)) err(`${where} markers: precisa ser uma lista`)
+            else {
+                if (beat.markers.length > MARKERS_MAX) err(`${where} markers: ${beat.markers.length} marcadores; o máximo é ${MARKERS_MAX}`)
+                beat.markers.forEach((marker, j) => {
+                    const path = `${where} markers[${j}]`
+                    if (marker?.n !== j + 1) err(`${path}.n: use ${j + 1} (vai de 1 sem repetir)`)
+                    for (const axis of ['x', 'y']) {
+                        const v = marker?.[axis]
+                        if (typeof v !== 'number' || !(v >= 0 && v <= 100)) err(`${path}.${axis}: use número de 0 a 100`)
+                    }
+                    for (const lang of LANGS) {
+                        if (!filled(marker?.label?.[lang])) err(`${path}.label.${lang}: ausente`)
+                        phraseRule(marker?.at?.[lang], longOf(beat, lang), `${path}.at.${lang}`)
+                    }
+                })
+            }
+        }
+
+        // Regra 12: diagram; flow de 2 a 4 nós, compare 2; back só em flow; rótulo até 28
+        if (beat.diagram != null) {
+            const diagram = beat.diagram
+            const path = `${where} diagram`
+            if (typeof diagram !== 'object' || Array.isArray(diagram)) err(`${path}: precisa ser um objeto`)
+            else {
+                if (!['flow', 'compare'].includes(diagram.type)) err(`${path}.type: use flow ou compare`)
+                if (!Array.isArray(diagram.nodes)) err(`${path}.nodes: precisa ser uma lista`)
+                else {
+                    const count = diagram.nodes.length
+                    if (diagram.type === 'flow' && (count < 2 || count > 4)) err(`${path}.nodes: flow tem de 2 a 4 nós`)
+                    if (diagram.type === 'compare' && count !== 2) err(`${path}.nodes: compare tem 2 nós`)
+                    diagram.nodes.forEach((node, j) => {
+                        labelRules(node?.label, `${path}.nodes[${j}].label`, DIAGRAM_LABEL_MAX)
+                        if (node?.tone !== undefined && !NODE_TONES.includes(node.tone)) {
+                            err(`${path}.nodes[${j}].tone: use crit, ok ou null`)
+                        }
+                    })
+                }
+                if (diagram.back != null) {
+                    if (diagram.type !== 'flow') err(`${path}.back: só em flow`)
+                    labelRules(diagram.back.label, `${path}.back.label`, DIAGRAM_LABEL_MAX)
+                }
             }
         }
 

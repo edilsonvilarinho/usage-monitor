@@ -51,6 +51,27 @@ Beat opcional `code: { file, from, to, caption? }`, no lugar de `image` (os dois
 - `caption`: `{ pt, en }` opcional; sem `items`, vira o primeiro item do beat.
 - Staging renderiza o trecho num PNG de 1500 px: fonte 26 px, descendo até 18 px se a linha mais longa não couber; indentação comum ao trecho é removida. O PNG entra no lugar de `image`.
 
+## Cena explica (`scene`, `markers`, `diagram`, `code.highlight`, `at`)
+
+Raiz opcional `"scene": "explica"`: a cena explicativa (`assets/scene-explica.js`) só vale no corte longo; o curto segue com a cena atual. Ausente = cena atual. Outro valor é erro (`scene: use "explica" ou ausente`).
+
+Campos opcionais de beat, todos com texto `{pt, en}`:
+
+- `markers`: `[{ "n": 1, "x": 12.5, "y": 30, "label": {pt,en}, "at": {pt,en} }]`. Só em beat com `image`; no máximo 6. `n` é 1, 2, 3… sem repetir. `x` e `y` são % da imagem, de 0 a 100.
+- `diagram`: `{ "type": "flow", "nodes": [{ "label": {pt,en}, "tone": "crit|ok|null" }], "back": { "label": {pt,en} } }`, ou `{ "type": "compare", "nodes": [2 nós] }`. `flow` tem de 2 a 4 nós; `back` é opcional, só em `flow`, e liga o último nó ao primeiro, por baixo. `compare` tem exatamente 2 nós e não tem `back`. Rótulo de nó e de `back` com no máximo 28 caracteres.
+- `code.highlight`: `[{ "lines": [76], "tone": "info|crit|ok", "note": {pt,en}, "at": {pt,en} }]`, dentro de `code`. É uma lista. `lines` ficam dentro de `from..to`. `note` tem no máximo 40 caracteres.
+- `at` (em `markers` e `code.highlight`): trecho literal do `long[lang]` do mesmo beat. Não existir no texto é erro do `check`, com o beat e o campo.
+
+Instante de um `at`: começo do trecho na fala, proporcional aos caracteres dentro de `speechStart..speechEnd`, com o mesmo critério de `timeCaptions` (`phraseTime` em `scripts/timeline.mjs`). `null` se o trecho não existe.
+
+Saída de `buildScript`, por beat, além de `kicker`, `title`, `items`, `id`, `start`, `end`, `speechStart`, `speechEnd`:
+
+- `markers: [{n, x, y, label, at}]` (`at` em segundos), só se o beat tem `markers`;
+- `diagram: {type, nodes: [{label, tone}], back: {label} | null}`, só se o beat tem `diagram`;
+- `code: {file, from, to, lines, highlight: [{lines, tone, note, at}]}`, só se o beat tem `code`. `lines` vêm do arquivo real, lidas pelo `make.mjs` (`codeLinesOf`) e passadas em `buildScript(..., { codeLines })`, sem a indentação comum. `at` em segundos. No curto, `at` é `null`.
+
+Raiz do `WF_SCRIPT`: `scene` (`"explica"` ou `null`). `make.mjs preview`, `voice` e `render` usam a mesma leitura de código; `render` lê o `WF_SCRIPT` gravado por `voice`.
+
 ## Forma falada (`toSpoken`)
 
 `say[lang]` explícito vence. Sem ele, a regra padrão: `ci-ok` → `C I OK`, `CI` → `C I`, `TDD` → `T D D`, `PR` → `P R`, `CLAUDE.md` → `Claude ponto M D` (PT) e `Claude dot M D` (EN), `usage-monitor-workflow` → `Usage Monitor Workflow`. Palavra inteira, nunca dentro de outra.
@@ -79,4 +100,4 @@ Entrada: lista `{ id, durationSec }` de falas, alvo e cauda. Primeira fala em 1,
 Legendas: frases cortadas em pontuação, depois em vírgula, depois em espaço, até 72 caracteres; tempo proporcional aos caracteres, contíguas dentro da fala.
 Cues: por item, `tick`, ou `red` com `crit`, ou `green` com `ok`; `impact` em `start + 0.6` do último beat. Ordenados por tempo. Sem som de abertura (pedido do dono no #684): a música entra com fade-in de 2 s. Não há som de transição entre beats (pedido do dono no #684): a transição é só visual.
 
-Saída `window.WF_SCRIPT = { variant, lang, duration, beats, cues, captions, link }`, com `kicker`, `title` e `items` traduzidos para o idioma da variante.
+Saída `window.WF_SCRIPT = { variant, lang, duration, beats, cues, captions, link, scene }`, com `kicker`, `title` e `items` traduzidos para o idioma da variante. `scene` é `"explica"` só no longo com a raiz `scene`; nos demais, `null`. Campos de beat da cena explica: ver "Cena explica" acima.
