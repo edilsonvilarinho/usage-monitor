@@ -80,7 +80,7 @@ Na tela: `PR A entra na main` · `PR B corrige algo que A quebrou` · `A deixou 
 
 Um script percorreu trinta e três dias de PRs. Para cada correção, ele procura a origem de duas formas: o número de PR citado no texto da correção, como neste trecho, ou o blame das linhas que ela mudou. Cada caso foi conferido à mão antes de contar.
 
-Código na tela: `tools/ci/escaped-defects.mjs:71-80`
+Código na tela: `tools/ci/escaped-defects.mjs:72-80`
 
 Na tela: `origem: número citado ou blame` · `cada caso conferido à mão`
 
@@ -278,7 +278,7 @@ Na tela: `PR A reaches main` · `PR B fixes something A broke` · `A let the def
 
 A script went through thirty-three days of PRs. For each fix, it looks for the origin in two ways: the PR number cited in the fix text, as in this excerpt, or the blame of the lines it changed. Every case was checked by hand before it counted.
 
-Código na tela: `tools/ci/escaped-defects.mjs:71-80`
+Código na tela: `tools/ci/escaped-defects.mjs:72-80`
 
 Na tela: `origin: cited number or blame` · `every case checked by hand`
 

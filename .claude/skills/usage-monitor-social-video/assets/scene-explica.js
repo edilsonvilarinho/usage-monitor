@@ -349,7 +349,7 @@ WF.register({
       const ph = hasD ? 490 : 610
       const panel = mk(`${PANEL}left:120px;top:${top}px;width:1680px;height:${ph}px;padding:12px 24px;background:${COL.s1}`)
       const head = mk(`display:flex;align-items:center;gap:16px;height:40px;margin-bottom:10px;border-bottom:1px solid ${COL.line}`)
-      const path = mk(`flex:1 1 auto;min-width:0;font:400 22px/40px ${MONO};color:${COL.mu};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`, `${C.file} · linhas ${C.from} a ${C.to}`)
+      const path = mk(`flex:1 1 auto;min-width:0;font:400 22px/40px ${MONO};color:${COL.mu};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`, `${C.file.split('/').slice(-2).join('/')}:${C.from}-${C.to}`)
       head.append(path)
       for (const it of B.items || []) chip(it, head, fx, true)
       // A fonte é definida depois de medir as linhas (abaixo).
