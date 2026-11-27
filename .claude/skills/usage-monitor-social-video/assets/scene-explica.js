@@ -47,7 +47,6 @@ WF.register({
       for (const k of Object.keys(attrs)) e.setAttribute(k, String(attrs[k]))
       return e
     }
-    const mctx = document.createElement('canvas').getContext('2d')
 
     // Céu do protótipo: gradientes no fundo e estrelas fixas (semente 7), todas no quadro inicial.
     stage.style.background = 'radial-gradient(ellipse 60% 70% at 8% 0%, rgba(30,61,143,.42), transparent 70%), '
@@ -224,24 +223,23 @@ WF.register({
       }
       return out
     }
-    // Maior fonte (até 26 px) em que nenhuma linha passa da coluna de balões e tudo cabe na altura; piso de 24 px.
+    // Medida da largura: no DOM, após o layout (ver buildCode). Constantes do trilho e da altura da linha.
     const TEXT_X = 120 + 24 + 56 + 14
-    const TEXT_MAX = 1585
     const CODE_X = 144
-    const fitCode = (lines, availH) => {
-      for (let fs = 26; fs > 24; fs -= 0.25) {
-        mctx.font = `${fs}px ${MONO}`
-        let right = 0
-        for (const s of lines) right = Math.max(right, CODE_X + (TEXT_X - CODE_X + mctx.measureText(s).width) * 1.04)
-        if (right <= TEXT_MAX && lines.length * fs * 1.5 <= availH) return fs
-      }
-      return 24
-    }
+    const BALLOON_W = 210
+    const BALLOON_X = 1800 - BALLOON_W
+    const TEXT_MAX = BALLOON_X - 24 // trilho: nenhum glifo de código fica sob um balão
+    const LH = 1.35 // altura de linha em múltiplos da fonte
 
     // Entrada em fade e deslize; a posição final fica fixa depois de entrar.
-    const chip = (it, parent, fx) => {
-      const c = mk(`display:inline-flex;align-items:center;gap:12px;height:50px;padding:0 20px;box-sizing:border-box;border:1px solid ${COL.line};border-radius:8px;background:${COL.s2};font:500 24px/1 ${MONO};color:${COL.fg};white-space:nowrap;opacity:0`)
-      c.append(mk(`width:12px;height:12px;border-radius:50%;background:${CHIP[it.status] || COL.info}`), mk('', tx(it.text), 'span'))
+    // compact: chip de cabeçalho do código, uma linha só, à direita.
+    const chip = (it, parent, fx, compact = false) => {
+      // Chip quebra linha dentro do painel (max-width 100%); o ponto não encolhe.
+      const size = compact
+        ? `flex:none;min-height:40px;padding:6px 14px;font:500 22px/1.2 ${MONO}`
+        : `max-width:100%;min-height:50px;padding:12px 20px;font:500 24px/1.3 ${MONO}`
+      const c = mk(`display:flex;align-items:center;gap:12px;${size};box-sizing:border-box;border:1px solid ${COL.line};border-radius:8px;background:${COL.s2};color:${COL.fg};white-space:${compact ? 'nowrap' : 'normal'};overflow-wrap:anywhere;opacity:0`)
+      c.append(mk(`flex:none;width:12px;height:12px;border-radius:50%;background:${CHIP[it.status] || COL.info}`), mk('min-width:0', tx(it.text), 'span'))
       parent.append(c)
       fx.push((t) => {
         const p = easeOut(span(t, it.at, 0.38))
@@ -252,11 +250,19 @@ WF.register({
 
     const buildShot = (B, i, content, fx) => {
       const shot = mk(`${PANEL}left:120px;top:200px;width:1040px;height:680px;background:${COL.s2}`)
-      const wrap = mk('position:absolute;left:0;top:14px;width:1040px;height:652px')
+      // Imagem inteira (contain): a caixa assume a proporção da imagem, centrada; marcadores em % dela.
+      const BW = 1040
+      const BH = 652
       const pic = images[i]
+      const nw = (pic && pic.naturalWidth) || BW
+      const nh = (pic && pic.naturalHeight) || BH
+      const sc = Math.min(BW / nw, BH / nh)
+      const fw = Math.round(nw * sc)
+      const fh = Math.round(nh * sc)
+      const wrap = mk(`position:absolute;left:${Math.round((BW - fw) / 2)}px;top:${14 + Math.round((BH - fh) / 2)}px;width:${fw}px;height:${fh}px`)
       if (pic) {
         pic.alt = 'Captura da janela de detalhe do monitor de uso'
-        pic.style.cssText = 'display:block;width:1040px;height:652px'
+        pic.style.cssText = `display:block;width:${fw}px;height:${fh}px`
         wrap.append(pic)
       }
       shot.append(wrap)
@@ -285,8 +291,8 @@ WF.register({
     const buildDiagram = (D, i, content, fx, E) => {
       const nodes = D.nodes || []
       const n = nodes.length
-      const box = mk('position:absolute;left:120px;top:200px;width:1680px;height:270px')
-      const svg = sv('svg', { width: 1680, height: 270, viewBox: '0 0 1680 270' })
+      const box = mk('position:absolute;left:120px;top:200px;width:1680px;height:190px')
+      const svg = sv('svg', { width: 1680, height: 190, viewBox: '0 0 1680 190' })
       svg.style.cssText = 'position:absolute;left:0;top:0;overflow:visible'
       const defs = sv('defs', {})
       for (const [id, color] of [[`ahm${i}`, COL.mu], [`aha${i}`, COL.gold]]) {
@@ -298,12 +304,12 @@ WF.register({
       box.append(svg)
       const flow = D.type !== 'compare'
       const w = flow ? (n <= 3 ? 400 : 330) : 780
-      const h = flow ? 120 : 150
-      const fs = flow ? 36 : 32
+      const h = 90
+      const fs = flow ? 32 : 30
       const xs = nodes.map((_, k) => (flow ? (k * (1680 - w)) / Math.max(1, n - 1) : k * 900))
       nodes.forEach((nd, k) => {
         const border = nd.tone === 'crit' ? COL.crit : nd.tone === 'ok' ? COL.ok : COL.line
-        const e = mk(`position:absolute;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;padding:0 28px;background:${COL.s2};border:2px solid ${border};border-radius:10px;font:500 ${fs}px/1.3 ${MONO};color:${COL.fg};left:${xs[k]}px;top:14px;width:${w}px;height:${h}px;opacity:0`, tx(nd.label))
+        const e = mk(`position:absolute;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;padding:0 20px;background:${COL.s2};border:2px solid ${border};border-radius:10px;font:500 ${fs}px/1.2 ${MONO};color:${COL.fg};left:${xs[k]}px;top:14px;width:${w}px;height:${h}px;opacity:0`, tx(nd.label))
         box.append(e)
         fx.push((t) => { e.style.opacity = String(easeOut(span(t, E + 0.15 * k, 0.38))) })
       })
@@ -320,13 +326,13 @@ WF.register({
       }
       if (flow) {
         for (let k = 0; k < n - 1; k++) {
-          arrow(`M${xs[k] + w + 4} 74 L${xs[k + 1] - 4} 74`, `ahm${i}`, COL.mu, E + 0.15 * k + 0.1)
+          arrow(`M${xs[k] + w + 4} 59 L${xs[k + 1] - 4} 59`, `ahm${i}`, COL.mu, E + 0.15 * k + 0.1)
         }
         if (D.back) {
           const xl = xs[n - 1] + w / 2
           const x0 = xs[0] + w / 2
-          arrow(`M${xl} 136 C${xl} 236, ${x0} 236, ${x0} 140`, `aha${i}`, COL.gold, E + 0.15 * n + 0.1)
-          const lb = mk(`position:absolute;left:${(x0 + xl) / 2 - 260}px;top:222px;width:520px;text-align:center;font:400 26px/1.3 ${SANS};color:${COL.mu};opacity:0`, tx(D.back.label))
+          arrow(`M${xl} 106 C${xl} 170, ${x0} 170, ${x0} 110`, `aha${i}`, COL.gold, E + 0.15 * n + 0.1)
+          const lb = mk(`position:absolute;left:${(x0 + xl) / 2 - 260}px;top:150px;width:520px;text-align:center;font:400 26px/1.3 ${SANS};color:${COL.mu};opacity:0`, tx(D.back.label))
           box.append(lb)
           fx.push((t) => { lb.style.opacity = String(easeOut(span(t, E + 0.15 * n + 0.3, 0.38))) })
         }
@@ -338,13 +344,16 @@ WF.register({
     const buildCode = (B, content, fx, E) => {
       const C = B.code
       const hasD = Boolean(B.diagram)
-      const top = hasD ? 492 : 270
-      const ph = hasD ? 408 : 610
-      const panel = mk(`${PANEL}left:120px;top:${top}px;width:1680px;height:${ph}px;padding:16px 24px;background:${COL.s1}`)
-      const head = mk(`height:38px;margin-bottom:12px;border-bottom:1px solid ${COL.line};font:400 22px/38px ${MONO};color:${COL.mu};white-space:nowrap;overflow:hidden`, `${C.file} · linhas ${C.from} a ${C.to}`)
-      const fs = fitCode(C.lines, ph - 32 - 50)
-      const lh = fs * 1.5
-      const body = mk(`white-space:pre;font:400 ${fs}px/${lh}px ${MONO};color:${COL.fg}`)
+      // Com diagrama, o painel começa logo abaixo dele; o chip vai no cabeçalho (à direita).
+      const top = hasD ? 404 : 270
+      const ph = hasD ? 490 : 610
+      const panel = mk(`${PANEL}left:120px;top:${top}px;width:1680px;height:${ph}px;padding:12px 24px;background:${COL.s1}`)
+      const head = mk(`display:flex;align-items:center;gap:16px;height:40px;margin-bottom:10px;border-bottom:1px solid ${COL.line}`)
+      const path = mk(`flex:1 1 auto;min-width:0;font:400 22px/40px ${MONO};color:${COL.mu};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`, `${C.file} · linhas ${C.from} a ${C.to}`)
+      head.append(path)
+      for (const it of B.items || []) chip(it, head, fx, true)
+      // A fonte é definida depois de medir as linhas (abaixo).
+      const body = mk(`white-space:pre;color:${COL.fg}`)
       panel.append(head, body)
       content.append(panel)
       const rows = C.lines.map((src, k) => {
@@ -358,6 +367,18 @@ WF.register({
         body.append(row)
         return { row, txt, ln: C.from + k, k }
       })
+      // Ajuste no DOM real: o beat fica visível mas invisível (visibility hidden) durante a medida, em mount.
+      // Desce de 26 px até 18 px; a linha mais larga, com o zoom de 1,04 do destaque (origem à esquerda), deve
+      // deixar 24 px entre o último glifo e o trilho do balão (TEXT_MAX). Altura: painel - padding - cabeçalho - margem.
+      const fit = () => {
+        for (let f = 26; f >= 18; f -= 0.25) {
+          body.style.font = `400 ${f}px/${f * LH}px ${MONO}`
+          let right = 0
+          for (const { txt } of rows) right = Math.max(right, CODE_X + (TEXT_X - CODE_X + txt.offsetWidth) * 1.04)
+          if (right <= TEXT_MAX && C.lines.length * f * LH <= ph - 74) return f
+        }
+        return 18
+      }
       const HL = C.highlight || []
       const activeAt = (t) => {
         let act = null
@@ -379,29 +400,38 @@ WF.register({
           }
         })
       }
-      for (const h of HL) {
-        if (!h.note) continue
-        const color = TONE[h.tone] || COL.gold
-        const cy = top + 66 + (h.lines[0] - C.from) * lh + lh / 2
-        const ball = mk(`position:absolute;box-sizing:border-box;left:1590px;top:${cy.toFixed(1)}px;width:210px;padding:10px 14px 10px 16px;background:${COL.s3};border:1px solid ${COL.line};border-left:4px solid ${color};border-radius:8px;font:500 22px/1.3 ${SANS};color:${COL.fg};transform:translateY(-50%);opacity:0`, tx(h.note))
-        ball.append(mk(`position:absolute;left:-9px;top:50%;margin-top:-8px;width:0;height:0;border-style:solid;border-width:8px 9px 8px 0;border-color:transparent ${color} transparent transparent`))
-        content.append(ball)
-        fx.push((t) => {
-          const on = activeAt(t) === h
-          ball.style.opacity = on ? String(easeOut(span(t, h.at, 0.38))) : '0'
-        })
-      }
+      const place = (fs) => {
+        const lh = fs * LH
+        body.style.font = `400 ${fs}px/${lh}px ${MONO}`
+        for (const h of HL) {
+          if (!h.note) continue
+          const color = TONE[h.tone] || COL.gold
+          // Linha 0 do corpo: 12 (padding) + 40 (cabeçalho) + 10 (margem).
+          const cy = top + 62 + (h.lines[0] - C.from) * lh + lh / 2
+          const ball = mk(`position:absolute;box-sizing:border-box;left:${BALLOON_X}px;top:${cy.toFixed(1)}px;width:${BALLOON_W}px;padding:10px 14px 10px 16px;background:${COL.s3};border:1px solid ${COL.line};border-left:4px solid ${color};border-radius:8px;font:500 22px/1.3 ${SANS};color:${COL.fg};transform:translateY(-50%);opacity:0`, tx(h.note))
+          ball.append(mk(`position:absolute;left:-9px;top:50%;margin-top:-8px;width:0;height:0;border-style:solid;border-width:8px 9px 8px 0;border-color:transparent ${color} transparent transparent`))
+          content.append(ball)
+          fx.push((t) => {
+            const on = activeAt(t) === h
+            ball.style.opacity = on ? String(easeOut(span(t, h.at, 0.38))) : '0'
+          })
+        }
+        }
+      return { fit, place }
     }
 
     // Cartões centralizados: todos a 35% desde a entrada; cada um acende no seu item.at.
     const buildCards = (items, content, fx) => {
-      const list = mk('position:absolute;left:510px;top:285px;width:900px;display:flex;flex-direction:column;gap:30px')
+      // Com 4 itens, cartões de 120 px e espaço de 20 px: a lista termina acima da faixa de legenda (84%).
+      const dense = items.length >= 4
+      const CH = dense ? 120 : 150
+      const list = mk(`position:absolute;left:510px;top:285px;width:900px;display:flex;flex-direction:column;gap:${dense ? 20 : 30}px`)
       content.append(list)
       for (const it of items) {
         const ok = it.status === 'ok'
         const crit = it.status === 'crit'
         const color = ok ? COL.ok : crit ? COL.crit : COL.gold
-        const card = mk(`display:flex;align-items:center;gap:24px;height:150px;padding:0 40px;box-sizing:border-box;background:${COL.s2};border:1px solid ${COL.line};border-left:8px solid ${color};border-radius:10px;font:500 44px/1.2 ${SANS};color:${COL.fg};opacity:0.35`)
+        const card = mk(`display:flex;align-items:center;gap:24px;height:${CH}px;padding:0 40px;box-sizing:border-box;background:${COL.s2};border:1px solid ${COL.line};border-left:8px solid ${color};border-radius:10px;font:500 44px/1.2 ${SANS};color:${COL.fg};opacity:0.35`)
         card.append(mk(`font:600 40px/1 ${MONO};color:${color}`, ok ? '✓' : crit ? '✗' : '·', 'span'), mk('', tx(it.text), 'span'))
         list.append(card)
         fx.push((t) => { card.style.opacity = String(0.35 + 0.65 * easeOut(span(t, it.at, 0.38))) })
@@ -419,6 +449,7 @@ WF.register({
     beats.forEach((B, i) => {
       const fx = []
       const E = enterOf(i)
+      let codeFit = null
       const root = mk(`position:absolute;left:0;top:0;width:${W}px;height:${H}px;display:none`)
       const head = mk('position:absolute;left:120px;top:52px;width:1680px;height:120px')
       head.append(
@@ -427,13 +458,15 @@ WF.register({
       )
       const content = mk(`position:absolute;left:0;top:0;width:${W}px;height:${H}px`)
       const items = B.items || []
-      if (B.image) {
+      // Código tem prioridade sobre imagem: beat com code.lines nunca mostra PNG.
+      if (B.image && !B.code && !B.diagram) {
         const key = buildShot(B, i, content, fx)
         for (const it of items) chip(it, key, fx)
       } else if (B.code || B.diagram) {
         if (B.diagram) buildDiagram(B.diagram, i, content, fx, E)
-        if (B.code) buildCode(B, content, fx, E)
-        if (items.length) {
+        if (B.code) codeFit = buildCode(B, content, fx, E)
+        // Beat com código: os chips já estão no cabeçalho do painel.
+        if (items.length && !B.code) {
           const row = mk(`position:absolute;left:120px;top:${B.diagram ? 430 : 200}px;width:1680px;display:flex;justify-content:flex-end;gap:16px`)
           content.append(row)
           for (const it of items) chip(it, row, fx)
@@ -451,6 +484,15 @@ WF.register({
       }
       root.append(head, content)
       stage.append(root)
+      if (codeFit) {
+        // Medida com as linhas reais: beat medível (visibility hidden, nunca display none) só durante o ajuste.
+        root.style.display = 'block'
+        root.style.visibility = 'hidden'
+        const fsCode = codeFit.fit()
+        root.style.display = 'none'
+        root.style.visibility = ''
+        codeFit.place(fsCode)
+      }
       beatEls.push(root)
       contents.push(content)
       fxs.push(fx)

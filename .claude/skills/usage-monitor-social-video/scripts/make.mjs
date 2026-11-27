@@ -108,7 +108,8 @@ async function stageImages(spec, videoDir, work) {
     map[beat.id] = `images/${name}`
   }
   // Beat com code: PNG do trecho de código (cartão em code-render.mjs), no mesmo diretório de imagens.
-  const codeBeats = spec.beats.filter((beat) => beat.code)
+  // Na cena explica o código vai ao vivo no quadro (code.lines), sem PNG; a cena antiga segue com o PNG.
+  const codeBeats = spec.scene === 'explica' ? [] : spec.beats.filter((beat) => beat.code)
   if (codeBeats.length) {
     const fontsDir = join(repoRoot(), 'src', 'desktopMain', 'resources', 'fonts')
     const fonts = {

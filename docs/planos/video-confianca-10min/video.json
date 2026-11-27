@@ -2,6 +2,7 @@
   "slug": "confianca-10min",
   "link": "https://github.com/edilsonvilarinho/usage-monitor",
   "longSeconds": 600,
+  "scene": "explica",
   "facts": [
     "issue #644, aberta em 2026-11-24; #679 fechada em 2026-11-26",
     "#645: 15,5% dos PRs de produto, 11 de 71, com defeito que escapou",
@@ -55,7 +56,35 @@
       "long": {
         "pt": "Isto é o Usage Monitor. É um app de desktop que fica numa barra no topo da tela, a HUD, e mostra quanto você já gastou da cota de cada assistente de IA, como Claude e Codex.",
         "en": "This is Usage Monitor. It is a desktop app that sits in a bar at the top of the screen, the HUD, and shows how much of each AI assistant quota you have used, like Claude and Codex."
-      }
+      },
+      "markers": [
+        {
+          "n": 1,
+          "x": 13.7,
+          "y": 42,
+          "label": {
+            "pt": "um anel por conta",
+            "en": "one ring per account"
+          },
+          "at": {
+            "pt": "fica numa barra no topo da tela",
+            "en": "sits in a bar at the top"
+          }
+        },
+        {
+          "n": 2,
+          "x": 25,
+          "y": 32,
+          "label": {
+            "pt": "uso em 5 h e em 7 dias",
+            "en": "use in 5 h and in 7 days"
+          },
+          "at": {
+            "pt": "mostra quanto você já gastou",
+            "en": "shows how much"
+          }
+        }
+      ]
     },
     {
       "id": "detalhe",
@@ -77,7 +106,61 @@
       "long": {
         "pt": "Um clique num anel abre o detalhe da conta: a sessão de cinco horas, o limite da semana e quando cada um reinicia. É uma janela pequena, sem moldura, desenhada por cima da sua área de trabalho. Guarde essa janela: ela volta mais adiante.",
         "en": "One click on a ring opens the account detail: the five-hour session, the weekly limit and when each one resets. It is a small frameless window drawn over your desktop. Keep that window in mind: it comes back later."
-      }
+      },
+      "markers": [
+        {
+          "n": 1,
+          "x": 22.9,
+          "y": 10.6,
+          "label": {
+            "pt": "o anel da conta",
+            "en": "the account ring"
+          },
+          "at": {
+            "pt": "Um clique num anel",
+            "en": "One click on a ring"
+          }
+        },
+        {
+          "n": 2,
+          "x": 9.1,
+          "y": 38,
+          "label": {
+            "pt": "sessão de 5 h",
+            "en": "5 h session"
+          },
+          "at": {
+            "pt": "a sessão de cinco horas",
+            "en": "the five-hour session"
+          }
+        },
+        {
+          "n": 3,
+          "x": 9.1,
+          "y": 51.8,
+          "label": {
+            "pt": "limite da semana",
+            "en": "weekly limit"
+          },
+          "at": {
+            "pt": "o limite da semana",
+            "en": "the weekly limit"
+          }
+        },
+        {
+          "n": 4,
+          "x": 44.6,
+          "y": 95.6,
+          "label": {
+            "pt": "janela sem moldura",
+            "en": "frameless window"
+          },
+          "at": {
+            "pt": "sem moldura",
+            "en": "frameless"
+          }
+        }
+      ]
     },
     {
       "id": "agentes",
@@ -370,8 +453,24 @@
       },
       "code": {
         "file": "tools/ci/escaped-defects.mjs",
-        "from": 71,
-        "to": 80
+        "from": 72,
+        "to": 80,
+        "highlight": [
+          {
+            "lines": [
+              76
+            ],
+            "tone": "info",
+            "note": {
+              "pt": "extrai o #número do texto",
+              "en": "pulls the #number from the text"
+            },
+            "at": {
+              "pt": "o número de PR citado",
+              "en": "the PR number cited"
+            }
+          }
+        ]
       },
       "items": [
         {
@@ -387,6 +486,38 @@
       "long": {
         "pt": "Um script percorreu trinta e três dias de PRs. Para cada correção, ele procura a origem de duas formas: o número de PR citado no texto da correção, como neste trecho, ou o blame das linhas que ela mudou. Cada caso foi conferido à mão antes de contar.",
         "en": "A script went through thirty-three days of PRs. For each fix, it looks for the origin in two ways: the PR number cited in the fix text, as in this excerpt, or the blame of the lines it changed. Every case was checked by hand before it counted."
+      },
+      "diagram": {
+        "type": "flow",
+        "nodes": [
+          {
+            "label": {
+              "pt": "PR A",
+              "en": "PR A"
+            },
+            "tone": null
+          },
+          {
+            "label": {
+              "pt": "main",
+              "en": "main"
+            },
+            "tone": null
+          },
+          {
+            "label": {
+              "pt": "PR B corrige",
+              "en": "PR B fixes"
+            },
+            "tone": "crit"
+          }
+        ],
+        "back": {
+          "label": {
+            "pt": "liga de volta a A",
+            "en": "links back to A"
+          }
+        }
       }
     },
     {
@@ -441,7 +572,41 @@
       "code": {
         "file": "src/desktopTest/kotlin/com/usagemonitor/architecture/ProseArchitectureRulesTest.kt",
         "from": 16,
-        "to": 29
+        "to": 29,
+        "highlight": [
+          {
+            "lines": [
+              18,
+              19,
+              20
+            ],
+            "tone": "crit",
+            "note": {
+              "pt": "acusa todo AlertDialog",
+              "en": "flags every AlertDialog"
+            },
+            "at": {
+              "pt": "Este proíbe o AlertDialog",
+              "en": "This one forbids AlertDialog"
+            }
+          },
+          {
+            "lines": [
+              26,
+              27,
+              28
+            ],
+            "tone": "ok",
+            "note": {
+              "pt": "pega o uso, ignora comentário",
+              "en": "catches use, ignores comments"
+            },
+            "at": {
+              "pt": "E o teste de baixo prova",
+              "en": "And the test below proves"
+            }
+          }
+        ]
       },
       "items": [
         {
@@ -457,6 +622,32 @@
       "long": {
         "pt": "Com o número na mão, atacamos a base. Regras que viviam só no CLAUDE.md viraram testes. Este proíbe o AlertDialog e aponta o diálogo do próprio app. E o teste de baixo prova que o padrão pega o uso real e ignora um comentário.",
         "en": "With the number in hand, we went after the base. Rules that lived only in CLAUDE.md became tests. This one forbids AlertDialog and points to the app own dialog. And the test below proves the pattern catches real use and ignores a comment."
+      },
+      "diagram": {
+        "type": "flow",
+        "nodes": [
+          {
+            "label": {
+              "pt": "regra no CLAUDE.md",
+              "en": "rule in CLAUDE.md"
+            },
+            "tone": null
+          },
+          {
+            "label": {
+              "pt": "teste",
+              "en": "test"
+            },
+            "tone": null
+          },
+          {
+            "label": {
+              "pt": "PR reprova",
+              "en": "PR fails"
+            },
+            "tone": "crit"
+          }
+        ]
       }
     },
     {
@@ -472,7 +663,38 @@
       "code": {
         "file": "src/commonMain/kotlin/com/usagemonitor/data/repository/SuspendRunCatching.kt",
         "from": 12,
-        "to": 20
+        "to": 20,
+        "highlight": [
+          {
+            "lines": [
+              17
+            ],
+            "tone": "crit",
+            "note": {
+              "pt": "pegaria o cancelamento",
+              "en": "would catch cancellation"
+            },
+            "at": {
+              "pt": "Mas um catch genérico",
+              "en": "But a generic catch"
+            }
+          },
+          {
+            "lines": [
+              15,
+              16
+            ],
+            "tone": "ok",
+            "note": {
+              "pt": "relança antes do genérico",
+              "en": "rethrows before the generic"
+            },
+            "at": {
+              "pt": "Aqui, o cancelamento é relançado",
+              "en": "Here, the cancellation is rethrown"
+            }
+          }
+        ]
       },
       "items": [
         {
@@ -484,6 +706,25 @@
       "long": {
         "pt": "Uma regra nova olhou para corrotinas. Quando uma tarefa do Kotlin é cancelada, ela precisa parar. Mas um catch genérico engole o cancelamento, e a tarefa segue viva. Aqui, o cancelamento é relançado antes do catch genérico. A regra achou sete pontos com o problema, todos corrigidos.",
         "en": "A new rule looked at coroutines. When a Kotlin task is cancelled, it has to stop. But a generic catch swallows the cancellation, and the task keeps running. Here, the cancellation is rethrown before the generic catch. The rule found seven places with the problem, all fixed."
+      },
+      "diagram": {
+        "type": "compare",
+        "nodes": [
+          {
+            "label": {
+              "pt": "catch genérico engole ✗",
+              "en": "generic catch swallows ✗"
+            },
+            "tone": "crit"
+          },
+          {
+            "label": {
+              "pt": "cancelamento relançado ✓",
+              "en": "cancellation rethrown ✓"
+            },
+            "tone": "ok"
+          }
+        ]
       }
     },
     {
@@ -499,7 +740,37 @@
       "code": {
         "file": "src/desktopTest/kotlin/com/usagemonitor/architecture/ArchitectureRulesTest.kt",
         "from": 617,
-        "to": 627
+        "to": 627,
+        "highlight": [
+          {
+            "lines": [
+              619
+            ],
+            "tone": "info",
+            "note": {
+              "pt": "conta os blocos longos",
+              "en": "counts the long blocks"
+            },
+            "at": {
+              "pt": "Agora um teste conta os blocos longos",
+              "en": "Now a test counts the long blocks"
+            }
+          },
+          {
+            "lines": [
+              623
+            ],
+            "tone": "ok",
+            "note": {
+              "pt": "teto que só desce",
+              "en": "ceiling that only goes down"
+            },
+            "at": {
+              "pt": "O teto só desce",
+              "en": "The ceiling only goes down"
+            }
+          }
+        ]
       },
       "items": [
         {
@@ -511,6 +782,32 @@
       "long": {
         "pt": "Comentário demais também é prosa: era mais de um quinto do Kotlin de produção. Agora um teste conta os blocos longos e reprova se o número subir. O teto só desce. E o build do Linux, que só avisava, passou a bloquear o merge.",
         "en": "Too many comments is prose too: it was more than a fifth of production Kotlin. Now a test counts the long blocks and fails if the number goes up. The ceiling only goes down. And the Linux build, which only warned, started blocking the merge."
+      },
+      "diagram": {
+        "type": "flow",
+        "nodes": [
+          {
+            "label": {
+              "pt": "conta os blocos",
+              "en": "count the blocks"
+            },
+            "tone": null
+          },
+          {
+            "label": {
+              "pt": "compara com o teto",
+              "en": "compare to ceiling"
+            },
+            "tone": null
+          },
+          {
+            "label": {
+              "pt": "subiu: reprova",
+              "en": "went up: fail"
+            },
+            "tone": "crit"
+          }
+        ]
       }
     },
     {
@@ -526,7 +823,28 @@
       "code": {
         "file": "src/desktopTest/kotlin/com/usagemonitor/HudPropertySupport.kt",
         "from": 105,
-        "to": 116
+        "to": 116,
+        "highlight": [
+          {
+            "lines": [
+              106,
+              107,
+              108,
+              109,
+              110,
+              111
+            ],
+            "tone": "info",
+            "note": {
+              "pt": "cada valor vem do sorteio",
+              "en": "every value is drawn"
+            },
+            "at": {
+              "pt": "um gerador sorteia cenários",
+              "en": "a generator draws scenarios"
+            }
+          }
+        ]
       },
       "items": [
         {
@@ -537,6 +855,32 @@
       "long": {
         "pt": "No meio da pirâmide, começamos pela geometria da HUD: onde a janela fica em cada borda, em cada monitor. Em vez de três exemplos, um gerador sorteia cenários: escala, tamanho e posição da tela, número de contas. A semente é fixa, então uma falha se repete igual.",
         "en": "In the middle of the pyramid, we started with the HUD geometry: where the window sits on each edge, on each monitor. Instead of three examples, a generator draws scenarios: scale, screen size and position, number of accounts. The seed is fixed, so a failure repeats exactly."
+      },
+      "diagram": {
+        "type": "flow",
+        "nodes": [
+          {
+            "label": {
+              "pt": "semente fixa",
+              "en": "fixed seed"
+            },
+            "tone": null
+          },
+          {
+            "label": {
+              "pt": "cenário sorteado",
+              "en": "random scenario"
+            },
+            "tone": null
+          },
+          {
+            "label": {
+              "pt": "falha repetível",
+              "en": "repeatable failure"
+            },
+            "tone": "ok"
+          }
+        ]
       }
     },
     {
@@ -552,7 +896,39 @@
       "code": {
         "file": "src/desktopTest/kotlin/com/usagemonitor/HudGeometryPropertyTest.kt",
         "from": 125,
-        "to": 133
+        "to": 133,
+        "highlight": [
+          {
+            "lines": [
+              126
+            ],
+            "tone": "info",
+            "note": {
+              "pt": "roda em cada cenário",
+              "en": "runs on every scenario"
+            },
+            "at": {
+              "pt": "vale para todo cenário",
+              "en": "holds for every scenario"
+            }
+          },
+          {
+            "lines": [
+              131,
+              132,
+              133
+            ],
+            "tone": "ok",
+            "note": {
+              "pt": "janela dentro da área útil",
+              "en": "window inside the work area"
+            },
+            "at": {
+              "pt": "ela continua inteira",
+              "en": "it stays fully inside"
+            }
+          }
+        ]
       },
       "items": [
         {
@@ -564,6 +940,32 @@
       "long": {
         "pt": "E o teste cobra uma regra que vale para todo cenário: onde quer que a janela solta pare, ela continua inteira dentro da área útil da tela. Para saber se isso pega erro, quebramos o código dez vezes, de propósito. O teste pegou as dez.",
         "en": "And the test enforces a rule that holds for every scenario: wherever the floating window stops, it stays fully inside the screen work area. To see whether it catches mistakes, we broke the code ten times, on purpose. The test caught all ten."
+      },
+      "diagram": {
+        "type": "flow",
+        "nodes": [
+          {
+            "label": {
+              "pt": "cenário qualquer",
+              "en": "any scenario"
+            },
+            "tone": null
+          },
+          {
+            "label": {
+              "pt": "posição calculada",
+              "en": "computed position"
+            },
+            "tone": null
+          },
+          {
+            "label": {
+              "pt": "dentro da tela",
+              "en": "inside the screen"
+            },
+            "tone": "ok"
+          }
+        ]
       }
     },
     {
@@ -586,7 +988,22 @@
       "long": {
         "pt": "Então veio o maior desafio. O teste de tela do Compose desenha a interface numa cena fora da tela. A imagem do detalhe, lá do começo, foi desenhada assim. O teste confere textos, botões e estados. Mas é só o desenho. Não existe janela de verdade ali.",
         "en": "Then came the hardest part. A Compose screen test draws the interface in an offscreen scene. The detail image from the start was drawn that way. The test checks text, buttons and states. But it is only the drawing. There is no real window there."
-      }
+      },
+      "markers": [
+        {
+          "n": 1,
+          "x": 25,
+          "y": 55,
+          "label": {
+            "pt": "só o desenho, sem janela",
+            "en": "drawing only, no window"
+          },
+          "at": {
+            "pt": "A imagem do detalhe",
+            "en": "The detail image"
+          }
+        }
+      ]
     },
     {
       "id": "tela-nao-ve",
@@ -657,7 +1074,22 @@
       "long": {
         "pt": "A saída foi testar o produto como o usuário recebe. O CI roda o instalador real, abre o app com uma conta falsa e sem rede, e grava a tela. Este é um quadro dessa gravação: a HUD recolhida, no topo de uma tela vazia.",
         "en": "The way out was to test the product the way users get it. CI runs the real installer, opens the app with a fake account and no network, and records the screen. This is a frame from that recording: the HUD collapsed at the top of an empty screen."
-      }
+      },
+      "markers": [
+        {
+          "n": 1,
+          "x": 51,
+          "y": 40,
+          "label": {
+            "pt": "a HUD recolhida, gravada no CI",
+            "en": "the collapsed HUD, recorded in CI"
+          },
+          "at": {
+            "pt": "Este é um quadro",
+            "en": "This is a frame"
+          }
+        }
+      ]
     },
     {
       "id": "defeito-plantado",
@@ -691,7 +1123,35 @@
       "long": {
         "pt": "Para provar que a gravação enxerga defeito, plantamos defeitos conhecidos. Em cima, o app certo. Embaixo, a HUD deslocada quarenta pixels. Um script mede a posição quadro a quadro, e reprovou. Em todas as provas, acertou todos os vereditos, sem alarme falso.",
         "en": "To prove the recording sees defects, we planted known ones. On top, the correct app. Below, the HUD shifted forty pixels. A script measures the position frame by frame, and it failed. Across every trial, it got every verdict right, with no false alarm."
-      }
+      },
+      "markers": [
+        {
+          "n": 1,
+          "x": 46,
+          "y": 18,
+          "label": {
+            "pt": "certo: x 394",
+            "en": "correct: x 394"
+          },
+          "at": {
+            "pt": "Em cima, o app certo",
+            "en": "On top, the correct app"
+          }
+        },
+        {
+          "n": 2,
+          "x": 56,
+          "y": 74,
+          "label": {
+            "pt": "plantado: x 434",
+            "en": "planted: x 434"
+          },
+          "at": {
+            "pt": "Embaixo, a HUD deslocada",
+            "en": "Below, the HUD shifted"
+          }
+        }
+      ]
     },
     {
       "id": "flash",
@@ -706,7 +1166,23 @@
       "code": {
         "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/WindowsDwmCloak.kt",
         "from": 36,
-        "to": 44
+        "to": 44,
+        "highlight": [
+          {
+            "lines": [
+              39
+            ],
+            "tone": "ok",
+            "note": {
+              "pt": "esconde no compositor (DWM)",
+              "en": "cloaks in the compositor (DWM)"
+            },
+            "at": {
+              "pt": "esconde a janela no compositor",
+              "en": "hides the window in the system compositor"
+            }
+          }
+        ]
       },
       "items": [
         {
@@ -723,6 +1199,25 @@
       "long": {
         "pt": "A gravação também transformou um defeito antigo em número. No Windows, a janela pré-aquecida piscava na tela em trinta e nove de novecentas e sessenta partidas. A correção esconde a janela no compositor do sistema antes de mostrá-la. Depois dela: zero em novecentas e sessenta.",
         "en": "The recording also turned an old defect into a number. On Windows, the prewarmed window flashed on screen in thirty-nine of nine hundred sixty starts. The fix hides the window in the system compositor before showing it. After it: zero in nine hundred sixty."
+      },
+      "diagram": {
+        "type": "compare",
+        "nodes": [
+          {
+            "label": {
+              "pt": "janela pisca ao abrir ✗",
+              "en": "window flashes on open ✗"
+            },
+            "tone": "crit"
+          },
+          {
+            "label": {
+              "pt": "escondida até ficar pronta ✓",
+              "en": "cloaked until ready ✓"
+            },
+            "tone": "ok"
+          }
+        ]
       }
     },
     {

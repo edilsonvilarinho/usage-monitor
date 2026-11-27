@@ -64,6 +64,7 @@
     await Promise.all([
       document.fonts.load('600 80px "IBM Plex Mono"'),
       document.fonts.load('500 30px "IBM Plex Mono"'),
+      document.fonts.load('400 26px "IBM Plex Mono"'), // código da cena explica: medido no mount, precisa da fonte real
       document.fonts.load('500 30px "IBM Plex Sans"'),
     ])
     // Imagens de beat (beat.image) são relativas ao arquivo de dados; ausentes ou com erro viram null.
