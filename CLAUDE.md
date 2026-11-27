@@ -157,9 +157,7 @@ Decisões e histórico em [`docs/build-and-release.md`](docs/build-and-release.m
   protege quem não optou. Opt-in `receiveBetaUpdates`; desligar não faz downgrade; só o sufixo
   `-beta.N` é aceito (workflow e updater do Linux). Exe/Dmg levam só o número; Deb/Rpm `~beta.N`.
   Publicação pela skill `usage-monitor-release-beta`.
-- Vídeo de lançamento (#503, #633): skill `usage-monitor-release-video` — vertical, PT e EN, telas **reais** (demos `video-*`), HUD
-  sem moldura, voz OpenRouter (`eleven-v4`/`george`, chave só por `OPENROUTER_API_KEY`), uma fala por passo; ritmo é regra (≤ 15
-  caracteres/s, ≤ 150 s): corta-se texto, nunca acelera a voz. Ferramentas fora de `build/`.
+- Vídeo de lançamento (#503, #633): só pela skill `usage-monitor-release-video`, que é a dona do padrão (voz, ritmo, chave).
 - Diagnóstico (#416): `app.log` recebe falha não tratada (registro no `CrashHandler`, nunca handler por escopo),
   `recordFailure`, `stderr` e EDT parado; `--diagnostics` empacota por **lista fechada**, sem janela.
 - Linha de comando (#418): `parseCommandLine` é o dono do `argv`; opção desconhecida avisa e **não** impede a abertura;
@@ -369,31 +367,16 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
   run com a suíte do desktop; informativo, **fora** do `ci-ok`.
 - Classe `open` com todo método `open` sobrescrito no teste: cobertura alta sem costura testada.
 
-## Fluxo de trabalho (desde 2026-10-22; sempre ativo desde 2026-10-28, #496)
+## Fluxo de trabalho (#496)
 
 **Vale para todo pedido que altera o repositório, sem o usuário citar o fluxo** — qualquer verbo ("ajusta",
-"corrige", "muda", "adiciona"), issue ou tarefa. Claude conduz o resto, nesta ordem e sem esperar aprovação entre os
-passos. Esta regra **é** a autorização de commit, push, PR e merge exigida pela skill `usage-monitor-commit-push`.
-Roteiro executável, com os comandos de cada passo: skill **`usage-monitor-workflow`**.
+"corrige", "muda", "adiciona"), issue ou tarefa. Claude conduz o resto sem esperar aprovação entre os passos. Esta
+regra **é** a autorização de commit, push, PR e merge exigida pela skill `usage-monitor-commit-push`. Os passos e
+comandos (issue com plano, `docs/planos/`, worktree, TDD vermelho na asserção, recorte de testes, PR com auto-merge,
+encerramento) são da skill **`usage-monitor-workflow`** — invoque-a antes de começar.
 
-1. **Issue sempre, e dois planos.** Sem issue, Claude cria uma (`gh issue create`). O plano vai na issue em **no
-   máximo 15 linhas** (o quê, atividades, onde, como valida). O detalhado, que Claude segue: `docs/planos/` com
-   atividades A01, A02… e tabela de pontos de situação. O do usuário, no chat: **no máximo um parágrafo**.
-2. **Desenvolvimento em TDD pelos agentes de implementação**, em worktree/branch própria, nunca na `main`; uma atividade, um commit. Teste primeiro e
-   vermelho **na asserção** (erro de compilação não conta), depois o código mínimo, depois a refatoração; a linha da
-   atividade no plano registra a execução vermelha e a verde. Correção de bug começa pelo teste que a reproduz.
-3. **Testes locais** antes do PR: só o **recorte** das classes que mudaram, mais o `ArchitectureRulesTest`, e a cobertura
-   do diff nesse recorte; a suíte completa e o relatório de testes são do CI (decisão do dono, #619).
-4. **PR** aberto por Claude, dizendo em que plataformas foi testado, com `gh pr merge --auto --merge` na abertura: o
-   ruleset da `main` exige o `ci-ok` e o GitHub mescla sozinho. Claude acompanha o CI e corrige o que ficar vermelho.
-5. **Parada de segurança:** cada run de CI vermelho, ou rodada de testes locais falhando depois de aberto o PR, é uma
-   incidência. Até a 3ª, Claude ajusta e tenta de novo; **na 4ª**, para de desenvolver, não mexe mais na branch e
-   devolve ao usuário com o diagnóstico de cada falha, o que tentou e o estado da branch. A conta é do
-   `node tools/ci/ci-incidents.mjs` (runs vermelhos do `ci.yml`, tentativas reexecutadas inclusive; falha local
-   registrada com `--local "<o que falhou>"`), nunca de memória: saída 3 é o limite.
-6. **Merge e encerramento.** O auto-merge mescla com o `ci-ok` verde e apaga a branch remota; nunca `--admin`. Claude
-   apaga a branch local e a worktree, **atualiza a `main` local** (`git pull --ff-only` no checkout principal), comenta na issue **os casos de teste criados em no máximo 20 linhas** (o que
-   cada um afirma, vermelho → verde, totais, cobertura do diff, o que ficou sem teste e por quê) e avisa o usuário.
+Inegociáveis: nunca commit na `main` nem `--admin`; **na 4ª incidência** (`node tools/ci/ci-incidents.mjs` sai 3) Claude
+para, não mexe mais na branch e devolve ao usuário o diagnóstico de cada falha.
 
 Pergunta que só pede explicação é respondida no chat, fora do fluxo.
 
