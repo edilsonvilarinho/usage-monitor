@@ -125,7 +125,7 @@ object UsageExporter {
                 session.cacheWrite1hTokens.toString(),
                 usdCell(session.costMicros),
                 session.isCostComplete.toString(),
-                session.liveContextTokens.toString()
+                session.liveContextTokens?.toString().orEmpty()
             )
         }
         return csvOf(header, rows)
@@ -243,7 +243,7 @@ private data class ExportedSessionDto(
     @SerialName("cache_write_1h_tokens") val cacheWrite1hTokens: Long,
     @SerialName("cost_micros_usd") val costMicros: Long,
     @SerialName("cost_is_complete") val costIsComplete: Boolean,
-    @SerialName("live_context_tokens") val liveContextTokens: Long
+    @SerialName("live_context_tokens") val liveContextTokens: Long?
 )
 
 private fun CliSessionSummary.toDto(): ExportedSessionDto {

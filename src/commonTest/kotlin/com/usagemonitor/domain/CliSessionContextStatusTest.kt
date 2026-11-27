@@ -3,6 +3,7 @@ package com.usagemonitor.domain
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.worstHealth
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.computeContextStatus
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
@@ -136,5 +137,72 @@ class CliSessionContextStatusTest {
             isSidechain = isSidechain,
             cacheReadTokens = cacheReadTokens
         )
+    }
+
+    /** Contexto não medido não tem saturação nem custo estimado: nunca zero disfarçado. */
+    @Test
+    fun `unmeasured live context has no saturation and no next cost`() {
+        val status = computeContextStatus(liveContextTokens = null, windowModel = OPUS_5, lastTurnModel = OPUS_5)
+
+        assertNull(status.liveContextTokens)
+        assertNull(status.contextSaturation)
+        assertNull(status.nextInteractionCostMicros)
+        assertNull(status.health)
+    }
+
+    /** Janela conhecida e zero medido é veredito HEALTHY, não ausência de veredito. */
+    @Test
+    fun `measured zero with a known window is healthy`() {
+        val status = computeContextStatus(liveContextTokens = 0L, windowModel = OPUS_5, lastTurnModel = OPUS_5)
+
+        assertEquals(CliSessionHealth.HEALTHY, status.health)
+    }
+
+    /** Sessão não medida não entra na contagem de pior veredito do time nem da HUD. */
+    @Test
+    fun `an unmeasured session does not contribute to the worst health`() {
+        val unmeasured = CliSessionSummary(
+            sessionId = "u",
+            filePath = "/tmp/u.jsonl",
+            firstTs = Instant.fromEpochMilliseconds(0L),
+            lastTs = Instant.fromEpochMilliseconds(1_000L),
+            primaryModel = OPUS_5,
+            liveContextTokens = null,
+            liveContextModel = OPUS_5
+        )
+
+        assertNull(listOf(unmeasured).worstHealth())
+    }
+
+    /** O detalhe de sessão não medida não tem veredito nem custo da próxima mensagem. */
+    @Test
+    fun `an unmeasured session detail has no verdict and no next cost`() {
+        val detail = CliSessionDetail(
+            summary = CliSessionSummary(
+                sessionId = "u",
+                filePath = "/tmp/u.jsonl",
+                firstTs = Instant.fromEpochMilliseconds(0L),
+                lastTs = Instant.fromEpochMilliseconds(1_000L),
+                primaryModel = OPUS_5,
+                liveContextTokens = null,
+                liveContextModel = OPUS_5
+            ),
+            turns = emptyList()
+        )
+
+        val analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+
+        assertNull(analytics.liveContextTokens)
+        assertNull(analytics.nextInteractionCostMicros)
+        assertNull(analytics.health)
+    }
+
+    /** Zero medido com janela conhecida é saturação zero, não "não medido". */
+    @Test
+    fun `measured zero live context has zero saturation`() {
+        val status = computeContextStatus(liveContextTokens = 0L, windowModel = OPUS_5, lastTurnModel = OPUS_5)
+
+        assertEquals(0L, status.liveContextTokens)
+        assertEquals(0.0, status.contextSaturation)
     }
 }

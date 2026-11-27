@@ -382,14 +382,14 @@ internal fun SessionAdvancedSections(
         )
         MetricCard(
             label = CliSessionsLabels.liveContext(language),
-            value = formatQuantity(analytics.liveContextTokens),
+            value = analytics.liveContextTokens?.let { tokens -> formatQuantity(tokens) } ?: "—",
             accent = accents.cacheRead,
             help = GlossaryTerm.LIVE_CONTEXT,
             language = language
         )
         MetricCard(
             label = CliSessionsLabels.nextInteraction(language),
-            value = formatMicrosUsd(analytics.nextInteractionCostMicros),
+            value = analytics.nextInteractionCostMicros?.let { micros -> formatMicrosUsd(micros) } ?: "—",
             accent = accents.input,
             help = GlossaryTerm.NEXT_INTERACTION,
             language = language
@@ -482,14 +482,15 @@ internal fun SessionHealthBanner(analytics: CliSessionAnalytics, language: AppLa
     // O veredito é o título, e o número que o gerou entra na descrição junto com
     // o conselho — antes eram três textos concorrendo na mesma linha.
     AppBanner(
-        title = CliSessionsLabels.healthTitle(health, language),
+        title = CliSessionsLabels.contextHealthTitle(health, language),
         tone = healthTone(health),
-        description = CliSessionsLabels.healthReason(
+        description = CliSessionsLabels.contextHealthReason(
+            health = health,
             saturationLabel = analytics.contextSaturation?.let { value -> formatPercent(value) },
-            nextCostLabel = formatMicrosUsd(analytics.nextInteractionCostMicros),
+            nextCostLabel = (analytics.nextInteractionCostMicros?.let { micros -> formatMicrosUsd(micros) } ?: "—"),
             language = language
         ),
-        detail = CliSessionsLabels.healthAdvice(health, language),
+        detail = CliSessionsLabels.contextHealthAdvice(health, language),
         modifier = Modifier.fillMaxWidth()
     )
 }

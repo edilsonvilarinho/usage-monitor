@@ -24,6 +24,21 @@ private val LAST_TS = Instant.parse("2026-08-01T11:00:00Z")
 
 class UsageExporterTest {
 
+    /** Sessão sem contexto medido sai com célula vazia no CSV, nunca zero. */
+    @Test
+    fun `a session without measured live context exports an empty csv cell`() {
+        val csv = UsageExporter.exportSessions(listOf(summary("a")), UsageExportFormat.CSV)
+
+        assertTrue(csv.trim().lines()[1].endsWith(","))
+    }
+
+    @Test
+    fun `a session without measured live context exports json null`() {
+        val json = UsageExporter.exportSessions(listOf(summary("a")), UsageExportFormat.JSON)
+
+        assertTrue(Regex("\"live_context_tokens\"\\s*:\\s*null").containsMatchIn(json))
+    }
+
     @Test
     fun `the sessions csv starts with the header and one line per session`() {
         val csv = UsageExporter.exportSessions(

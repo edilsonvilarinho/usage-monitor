@@ -108,7 +108,7 @@ data class CliSessionSummary(
      * propriedade do estado atual dela, e recortá-la por janela de quota daria um
      * número sem significado.
      */
-    val liveContextTokens: Long = 0L,
+    val liveContextTokens: Long? = null,
     /** Modelo desse último turno principal; define a tarifa da próxima mensagem. */
     val liveContextModel: String? = null,
     /**
@@ -287,8 +287,8 @@ data class CliSessionAnalytics(
     val cacheHitRate: Double = 0.0,
     val cacheSavingsMicros: Long = 0L,
     val averageContextPerTurn: Long = 0L,
-    val liveContextTokens: Long = 0L,
-    val nextInteractionCostMicros: Long = 0L,
+    val liveContextTokens: Long? = null,
+    val nextInteractionCostMicros: Long? = null,
     val contextSaturation: Double? = null,
     val costBreakdown: CliSessionCostBreakdown = CliSessionCostBreakdown(),
     val mainTurnCount: Int = 0,
@@ -347,7 +347,7 @@ data class CliSessionAnalytics(
      * Status da sessão. Delega em [CliSessionContextStatus] para que o detalhe e a
      * lista deem sempre o mesmo veredito a partir dos mesmos insumos.
      */
-    val health: CliSessionHealth
+    val health: CliSessionHealth?
         get() = contextStatus.health
 
     val isSaturated: Boolean
@@ -406,5 +406,5 @@ fun Iterable<CliSessionSummary>.tallyHealth(): CliSessionHealthTally {
 
 /** Pior veredito do conjunto, ou `null` quando nenhuma sessão pôde ser avaliada. */
 fun Iterable<CliSessionSummary>.worstHealth(): CliSessionHealth? {
-    return withKnownWindow().maxOfOrNull { session -> session.contextStatus.health }
+    return withKnownWindow().mapNotNull { session -> session.contextStatus.health }.maxOrNull()
 }

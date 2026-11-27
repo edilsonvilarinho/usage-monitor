@@ -2,6 +2,7 @@ package com.usagemonitor.terminal
 
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.SYNTHETIC_MODEL_ID
 import com.usagemonitor.presentation.terminal.TuiNotice
 import com.usagemonitor.presentation.terminal.TuiSessionPeriod
 import com.usagemonitor.presentation.terminal.TuiSessionsLabels
@@ -20,6 +21,42 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 class TuiSessionsReaderTest {
+
+    @Test
+    fun `a session without a real main turn shows no context tokens`() {
+        val dir = Files.createTempDirectory("usage-monitor-tui-context-null").toFile()
+        try {
+            val database = ClaudeTranscriptFixture.indexed(
+                dir,
+                mapOf("sintetica" to listOf(ClaudeTranscriptFixture.assistantLine("sintetica", "m-1", "2026-10-21T16:00:00Z", 1_000, 100, model = SYNTHETIC_MODEL_ID)))
+            )
+            TuiStores(cliIndex = database, codexIndex = File(dir, "sem-codex.db"), history = File(dir, "sem-historico.db")).use { stores ->
+                val loaded = TuiSessionsReader(stores, exportDirectory = dir).load(TuiSessionsState(turnsOpen = true), now)
+
+                assertNull(loaded.sessions.single().contextTokens)
+            }
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `a measured zero context shows zero tokens`() {
+        val dir = Files.createTempDirectory("usage-monitor-tui-context-zero").toFile()
+        try {
+            val database = ClaudeTranscriptFixture.indexed(
+                dir,
+                mapOf("medida" to listOf(ClaudeTranscriptFixture.assistantLine("medida", "m-1", "2026-10-21T16:00:00Z", 1_000, 100)))
+            )
+            TuiStores(cliIndex = database, codexIndex = File(dir, "sem-codex.db"), history = File(dir, "sem-historico.db")).use { stores ->
+                val loaded = TuiSessionsReader(stores, exportDirectory = dir).load(TuiSessionsState(turnsOpen = true), now)
+
+                assertEquals(0L, loaded.sessions.single().contextTokens)
+            }
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 
     // Quarta, 21/10/2026, 14:23 BRT.
     private val now = Instant.parse("2026-10-21T17:23:00Z")

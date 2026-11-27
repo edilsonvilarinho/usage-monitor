@@ -69,6 +69,7 @@ import com.usagemonitor.presentation.viewmodel.CliSessionsView
 import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -968,6 +969,68 @@ class CliSessionsScreenTest {
         ).assertIsDisplayed()
         // O motivo do status precisa estar visível para o alerta ser conferível.
         onNodeWithText("65% da janela · \$0.3250 por mensagem").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the list row says the context is unavailable instead of healthy`() = runDesktopComposeUiTest {
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(
+                                summary("session-abcdef01").copy(
+                                    liveContextTokens = null,
+                                    liveContextModel = null
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Contexto indisponível").assertIsDisplayed()
+        onNodeWithText("Sessão saudável").assertDoesNotExist()
+    }
+
+    @Test
+    fun `detail says the context is unavailable instead of healthy`() = runDesktopComposeUiTest {
+        // Sem turno da thread principal: contexto vivo e próxima interação são "não medidos".
+        val summary = summary("session-abcdef01").copy(liveContextTokens = null, liveContextModel = null)
+        val detail = CliSessionDetail(summary = summary, turns = emptyList())
+
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Success(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Contexto indisponível").assertIsDisplayed()
+        onNodeWithText("Sessão saudável").assertDoesNotExist()
+        // Cartões de contexto vivo e próxima interação mostram "—", não zero.
+        assertTrue(onAllNodesWithText("—").fetchSemanticsNodes().size >= 2)
     }
 
     @Test

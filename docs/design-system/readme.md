@@ -34,7 +34,8 @@ about the user: "Limite de requisições atingido", not "Você atingiu o limite"
 eyebrows and column headers, with `.07em` tracking. Never small caps, never uppercase above 10px.
 
 **Every state carries a word.** `Normal` · `Atenção` · `Crítico` · `Desconectado` ·
-`Saudável` · `Saturada` · `Trabalhando agora` · `Conectado`. A colored dot alone is never
+`Saudável` · `Saturada` · `Trabalhando agora` · `Conectado` · `Contexto indisponível` (neutro:
+o contexto não foi medido, então não é saudável nem crítico). A colored dot alone is never
 a status.
 
 **A disabled control always says why.** Not "Indisponível" but the actual reason:

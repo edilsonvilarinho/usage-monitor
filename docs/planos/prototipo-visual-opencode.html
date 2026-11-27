@@ -1649,7 +1649,22 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
         <div class="hstack" style="gap:var(--s2)"><span class="st warn">Atenção</span><span class="k">46% da janela · US$ 0,2300 por mensagem</span></div>
         <span class="k">Modelos (% do custo): claude-opus-5 100%</span>
       </div></div>
+      <div class="row"><div class="stack" style="gap:var(--s1);flex:1">
+        <div class="hstack" style="gap:var(--s3)">
+          <div class="stack" style="gap:0;width:170px"><span class="v sm">a5518d6b</span><span class="k">12/08 09:40 BRT</span></div>
+          <button class="btn icon" type="button" aria-label="Copiar comando de retomada">⧉</button>
+          <div class="stack" style="gap:0;width:130px"><span class="v sm">docs-portal</span><span class="k">5 turnos</span></div>
+          <span class="v sm" style="width:136px">61,2 K</span>
+          <div class="stack" style="gap:0;width:90px"><span class="v sm">—</span></div>
+          <span class="v sm" style="width:96px">US$ 0,1620</span>
+          <span class="v sm" style="width:84px">0h 14min</span>
+          <span class="v sm" style="width:76px">—</span>
+        </div>
+        <div class="hstack" style="gap:var(--s2)"><span class="st off">Contexto indisponível</span><span class="k">Sem turno da thread principal: o contexto não foi medido.</span></div>
+        <span class="k">Modelos (% do custo): sonnet-4-5-legacy 100%</span>
+      </div></div>
     </div></div>
+    <p class="note" style="margin:var(--s2) 0 var(--s4)"><b>Contexto indisponível (#694).</b> Sessão sem turno real na thread principal (só aviso <code>&lt;synthetic&gt;</code> ou só subagente) não tem contexto vivo medido. O veredito sai em tom neutro (<code>st off</code>, cinza, bolinha vazada), com a palavra "Contexto indisponível" e a razão na linha; não aparece como Saudável, não gera alerta e não entra no pior veredito do time. Os números que dependem do contexto mostram "—", nunca zero.</p>
     <p class="note" style="margin:var(--s2) 0 var(--s4)"><b>A legenda vive uma vez só, numa faixa acima da lista.</b>
     Esta seção dizia o contrário até a issue #81: o rótulo era repetido em cada célula porque elas somavam quase 1.000dp
     e a janela abre em 960, então a linha precisava quebrar — e cabeçalho fixo sobre linha que quebra desalinha. O que
@@ -1904,6 +1919,36 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
   </div>
 </div>
 
+<p class="note"><b>Contexto indisponível (#694).</b> Variante da mesma tela para sessão sem turno real na thread principal: o banner sai neutro (barra cinza, sem "Saturada") com o conselho próprio; contexto vivo, saturação e custo da próxima mensagem mostram "—", não zero. O cabeçalho repete a palavra do estado.</p>
+<div class="win">
+  <div class="titlebar"><span class="t">Sessões CLI — Anthropic · Contexto não medido</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="hstack">
+      <button class="btn ghost" type="button">← Voltar</button>
+      <span class="v sm">a5518d6b</span>
+      <span class="sp"></span>
+      <span class="st off">Contexto indisponível</span>
+    </div>
+
+    <div class="banner"><span class="bar"></span><div class="stack" style="gap:2px">
+      <span class="bt">Contexto indisponível</span>
+      <span class="bd">Sem turno da thread principal ainda; o contexto volta a ser medido no próximo turno.</span>
+    </div></div>
+
+    <div class="g4">
+      <div class="metric"><span class="k">Turnos</span><span class="v big">5</span></div>
+      <div class="metric"><span class="k">Contexto vivo</span><span class="v big">—</span></div>
+      <div class="metric"><span class="k">Custo</span><span class="v big">US$ 0,1620</span></div>
+      <div class="metric"><span class="k">Tempo ativo</span><span class="v big">0h 14min</span></div>
+    </div>
+
+    <div class="panel"><div class="phead"><span class="ptitle">Avançado</span><span class="sp"></span><span class="k">recolher</span></div><div class="pbody flush">
+      <div class="row"><span class="k">Saturação</span><span class="sp"></span><span class="v sm">—</span></div>
+      <div class="row"><span class="k">Custo da próxima msg</span><span class="sp"></span><span class="v sm">—</span></div>
+    </div></div>
+    <span class="k">Estimado a preço de tabela. Não é uma fatura.</span>
+  </div>
+</div>
 <p class="note"><b>Modelos da sessão (#445).</b> Logo abaixo dos números do resumo, fora do Avançado: qual modelo pesou é parte da resposta a "por que esta sessão gastou tanto", não apuração. Um modelo por linha, com turnos, tokens, <b>cache lido e gravado</b> (o recorte que a conversa citada na issue pediu para diagnosticar o pico da janela de 5 h), custo e a participação com trilha. Os números saem dos turnos e somam o subagente, cujo gasto é real; no detalhe do time sem turnos, saem do corte <code>(sessão, modelo)</code> do resumo. Colunas de 64/136/96/96/96/110dp, abaixo do que o detalhe deixa em 960dp.</p>
 <p class="note"><b>Grade 2×2 de gráficos por turno (#393, direção T3).</b> O detalhe deixa de ter um gráfico só no primeiro nível: contexto, acerto do cache, saída e custo × economia acumulados ficam lado a lado (uma coluna abaixo de 600dp). "Avançado" fica com a composição, a distribuição do custo, a economia e o cache gravado 5m/1h. O bloco "Taxa de acerto de cache" do resumo virou "Acerto do cache": com o <code>?</code> o rótulo longo cortava em 168dp.</p>
 

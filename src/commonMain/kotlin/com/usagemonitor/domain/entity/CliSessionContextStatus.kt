@@ -10,26 +10,33 @@ package com.usagemonitor.domain.entity
  * caminhos passam por aqui.
  */
 data class CliSessionContextStatus(
-    val liveContextTokens: Long = 0L,
-    /** `null` quando a janela do modelo não é conhecida — nunca se assume um valor. */
+    /** `null` quando o turno da thread principal não foi medido — nunca se assume zero. */
+    val liveContextTokens: Long? = null,
+    /** `null` quando a janela do modelo não é conhecida ou o contexto não foi medido. */
     val contextSaturation: Double? = null,
-    val nextInteractionCostMicros: Long = 0L
+    /** `null` quando o contexto não foi medido: sem contexto não há custo estimado. */
+    val nextInteractionCostMicros: Long? = null
 ) {
     /**
      * Quanto da janela já está ocupado e quanto custa continuar, avaliados em
      * paralelo: numa janela pequena a fração pode ser modesta e a mensagem ainda
      * assim sair cara.
      */
-    val health: CliSessionHealth
+    val health: CliSessionHealth?
         get() {
+            // Contexto não medido não tem veredito: `null` é "indisponível", não HEALTHY.
+            if (liveContextTokens == null) {
+                return null
+            }
             val saturation = contextSaturation ?: 0.0
+            val nextCost = nextInteractionCostMicros ?: 0L
             return when {
                 saturation >= CliSessionHealthThresholds.SATURATED_WINDOW_FRACTION ||
-                    nextInteractionCostMicros >= CliSessionHealthThresholds.SATURATED_NEXT_COST_MICROS ->
+                    nextCost >= CliSessionHealthThresholds.SATURATED_NEXT_COST_MICROS ->
                     CliSessionHealth.SATURATED
 
                 saturation >= CliSessionHealthThresholds.ATTENTION_WINDOW_FRACTION ||
-                    nextInteractionCostMicros >= CliSessionHealthThresholds.ATTENTION_NEXT_COST_MICROS ->
+                    nextCost >= CliSessionHealthThresholds.ATTENTION_NEXT_COST_MICROS ->
                     CliSessionHealth.ATTENTION
 
                 else -> CliSessionHealth.HEALTHY
@@ -41,26 +48,35 @@ data class CliSessionContextStatus(
  * Deriva o status a partir do contexto vivo — o `cache_read` do último turno da
  * thread principal, que é o volume reenviado na próxima mensagem.
  *
+ * [liveContextTokens] `null` é "não medido": sem saturação e sem custo estimado.
  * [windowModel] é o modelo predominante da sessão e define a janela de contexto.
  * [lastTurnModel] é o modelo do último turno e define a tarifa de cache read:
  * é ele que vai reenviar o contexto. Numa sessão que não trocou de modelo os
  * dois coincidem.
  */
 fun computeContextStatus(
-    liveContextTokens: Long,
+    liveContextTokens: Long?,
     windowModel: String?,
     lastTurnModel: String?
 ): CliSessionContextStatus {
     val contextWindow = ModelContextWindowTable.forModel(windowModel)?.takeIf { window -> window > 0L }
     val pricing = ModelPricingTable.forModel(lastTurnModel)
+    val saturation = if (liveContextTokens == null || contextWindow == null) {
+        null
+    } else {
+        liveContextTokens.toDouble() / contextWindow.toDouble()
+    }
+    val nextCostMicros = if (liveContextTokens == null) {
+        null
+    } else if (pricing == null) {
+        0L
+    } else {
+        liveContextTokens * pricing.forPrompt(liveContextTokens).cacheReadMicrosPerMillion / MICROS_PER_USD
+    }
 
     return CliSessionContextStatus(
         liveContextTokens = liveContextTokens,
-        contextSaturation = contextWindow?.let { window -> liveContextTokens.toDouble() / window.toDouble() },
-        nextInteractionCostMicros = if (pricing == null) {
-            0L
-        } else {
-            liveContextTokens * pricing.forPrompt(liveContextTokens).cacheReadMicrosPerMillion / MICROS_PER_USD
-        }
+        contextSaturation = saturation,
+        nextInteractionCostMicros = nextCostMicros
     )
 }

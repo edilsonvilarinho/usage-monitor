@@ -21,6 +21,20 @@ class CliSessionAnalyticsTest {
     private val computeAnalytics = ComputeCliSessionAnalyticsUseCase()
 
     @Test
+    fun `a session with only synthetic turns has no measured context saturation`() {
+        val analytics = computeAnalytics(detail(turn(seq = 1, model = SYNTHETIC_MODEL_ID)))
+
+        assertNull(analytics.contextSaturation)
+    }
+
+    @Test
+    fun `a session with only sidechain turns has no measured context saturation`() {
+        val analytics = computeAnalytics(detail(turn(seq = 1, cacheReadTokens = 900_000L, isSidechain = true)))
+
+        assertNull(analytics.contextSaturation)
+    }
+
+    @Test
     fun `cache hit rate uses reads over reads plus writes`() {
         val summary = summary(cacheReadTokens = 800L, cacheWrite5mTokens = 100L, cacheWrite1hTokens = 100L)
 
@@ -169,10 +183,10 @@ class CliSessionAnalyticsTest {
     }
 
     @Test
-    fun `session without turns is healthy`() {
+    fun `session without turns has no verdict because its context is unmeasured`() {
         val detail = CliSessionDetail(summary = summary(), turns = emptyList())
 
-        assertEquals(CliSessionHealth.HEALTHY, computeAnalytics(detail).health)
+        assertEquals(null, computeAnalytics(detail).health)
     }
 
     @Test
@@ -272,14 +286,14 @@ class CliSessionAnalyticsTest {
     }
 
     @Test
-    fun `session without turns yields neutral analytics`() {
+    fun `session without turns leaves live context unmeasured instead of zero`() {
         val detail = CliSessionDetail(summary = summary(), turns = emptyList())
 
         val analytics = computeAnalytics(detail)
 
         assertEquals(0L, analytics.averageContextPerTurn)
-        assertEquals(0L, analytics.liveContextTokens)
-        assertEquals(0L, analytics.nextInteractionCostMicros)
+        assertEquals(null, analytics.liveContextTokens)
+        assertEquals(null, analytics.nextInteractionCostMicros)
         assertEquals(0L, analytics.costBreakdown.totalMicros)
         assertEquals(emptyList(), analytics.contextPerTurn)
     }

@@ -780,7 +780,10 @@ class TeamUsageScreenTest {
 
     @Test
     fun `servidor sem os turnos avisa e esconde os graficos por turno`() = runDesktopComposeUiTest {
-        val summary = session("abcdef0123", tokens = 40_000L, cost = 5_000_000L).copy(primaryModel = OPUS)
+        val summary = session("abcdef0123", tokens = 40_000L, cost = 5_000_000L).copy(
+            primaryModel = OPUS,
+            liveContextTokens = 0L
+        )
 
         renderSuccess(
             TeamUsageUiState.Success(

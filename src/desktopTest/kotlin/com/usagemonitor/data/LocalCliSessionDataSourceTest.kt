@@ -2,7 +2,6 @@ package com.usagemonitor.data
 
 import com.usagemonitor.data.datasource.LocalCliSessionDataSource
 import com.usagemonitor.domain.entity.CliProjectRoot
-import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionTailOutcome
 import com.usagemonitor.domain.entity.SYNTHETIC_MODEL_ID
 import com.usagemonitor.domain.entity.activeTimeMillisOf
@@ -550,9 +549,41 @@ class LocalCliSessionDataSourceTest {
             dataSource.syncIndex()
 
             val session = dataSource.readSessions().single()
-            assertEquals(0L, session.liveContextTokens)
+            assertNull(session.liveContextTokens)
             assertNull(session.liveContextModel)
-            assertEquals(CliSessionHealth.HEALTHY, session.contextStatus.health)
+            assertNull(session.contextStatus.health)
+            assertNull(assertNotNull(dataSource.readSession("session-a")).summary.liveContextTokens)
+        }
+    }
+
+    /** Sem turno da thread principal o contexto não foi medido: null, nunca zero. */
+    @Test
+    fun `a session with only synthetic turns has no measured live context`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", model = SYNTHETIC_MODEL_ID)
+            )
+            dataSource.syncIndex()
+
+            assertNull(dataSource.readSessions().single().liveContextTokens)
+            assertNull(assertNotNull(dataSource.readSession("session-a")).summary.liveContextTokens)
+        }
+    }
+
+    /** Turno real da thread principal sem cache_read é medido e vale zero. */
+    @Test
+    fun `a real main turn without cache read measures zero live context`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", cacheReadTokens = 0L)
+            )
+            dataSource.syncIndex()
+
+            assertEquals(0L, dataSource.readSessions().single().liveContextTokens)
         }
     }
 

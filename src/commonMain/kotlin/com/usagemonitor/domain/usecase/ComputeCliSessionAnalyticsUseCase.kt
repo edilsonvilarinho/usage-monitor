@@ -35,7 +35,7 @@ class ComputeCliSessionAnalyticsUseCase {
         // Mesmo cálculo que a lista faz a partir do índice: um único caminho para
         // que os dois nunca divirjam.
         val contextStatus = computeContextStatus(
-            liveContextTokens = lastMainTurn?.cacheReadTokens ?: 0L,
+            liveContextTokens = lastMainTurn?.cacheReadTokens,
             windowModel = detail.summary.primaryModel,
             lastTurnModel = lastMainTurn?.model
         )

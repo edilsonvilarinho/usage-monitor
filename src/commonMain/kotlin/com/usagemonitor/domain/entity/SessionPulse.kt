@@ -100,7 +100,7 @@ fun Iterable<CliSessionSummary>.toSessionPulse(
     val alerts = withKnownWindow()
         .filter { session -> session.lastTs.toEpochMilliseconds() >= cutoffMillis }
         .mapNotNull { session ->
-            val health = session.contextStatus.health
+            val health = session.contextStatus.health ?: return@mapNotNull null
             if (health == CliSessionHealth.HEALTHY) {
                 return@mapNotNull null
             }

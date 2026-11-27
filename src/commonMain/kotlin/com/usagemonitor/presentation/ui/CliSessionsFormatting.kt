@@ -606,6 +606,29 @@ internal object CliSessionsLabels {
     fun turnsLabel(count: Int, language: AppLanguage): String {
         return if (language == AppLanguage.PT) "$count turnos" else "$count turns"
     }
+
+    /** Sessão sem turno da thread principal: contexto não medido, nunca zero. */
+    internal fun contextHealthShort(health: CliSessionHealth?, language: AppLanguage): String =
+        if (health == null) localized(language, "Contexto indisponível", "Context unavailable")
+        else CliSessionsLabels.healthShort(health, language)
+
+    internal fun contextHealthTitle(health: CliSessionHealth?, language: AppLanguage): String =
+        if (health == null) localized(language, "Contexto indisponível", "Context unavailable")
+        else CliSessionsLabels.healthTitle(health, language)
+
+    internal fun contextHealthAdvice(health: CliSessionHealth?, language: AppLanguage): String =
+        if (health == null) {
+            localized(language, "Sem turno da thread principal ainda; o contexto volta a ser medido no próximo turno.", "No main-thread turn yet; context is measured again on the next turn.")
+        } else {
+            CliSessionsLabels.healthAdvice(health, language)
+        }
+
+    internal fun contextHealthReason(health: CliSessionHealth?, saturationLabel: String?, nextCostLabel: String, language: AppLanguage): String =
+        if (health == null) {
+            localized(language, "Sem turno da thread principal: o contexto não foi medido.", "No main-thread turn: context was not measured.")
+        } else {
+            CliSessionsLabels.healthReason(saturationLabel, nextCostLabel, language)
+        }
 }
 
 /**
